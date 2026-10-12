@@ -27,59 +27,33 @@ FONT_LARGE = pygame.font.SysFont("Trebuchet MS", 28, bold=True)
 FONT_MED = pygame.font.SysFont("Trebuchet MS", 20, bold=True)
 FONT_SMALL = pygame.font.SysFont("Trebuchet MS", 15, bold=True)
 
-# Locate the spritesheet image dynamically across root directory
-POSSIBLE_PATHS = [
-    os.path.join(BASE_DIR, "updated-card-2026.png"),
-    os.path.join(BASE_DIR, "input_file_0.png"),
-    os.path.join(BASE_DIR, "CuteCards - asset pack 0.1update", "CuteCards - asset pack", "CuteCards.png")
-]
-
-SPRITE_PATH = None
-for p in POSSIBLE_PATHS:
-    if os.path.exists(p):
-        SPRITE_PATH = p
-        break
+SPRITE_PATH = os.path.join(
+    BASE_DIR, 
+    "CuteCards - asset pack 0.1update", 
+    "CuteCards - asset pack", 
+    "CuteCards.png"
+)
 
 
 class SpriteSheetLoader:
-    """Robust image loader supporting both 840x480 grid (56x80px) and legacy sheets."""
     def __init__(self, path):
         self.sprites = {}
-        if path and os.path.exists(path):
+        if os.path.exists(path):
             sheet = pygame.image.load(path).convert_alpha()
-            s_width, s_height = sheet.get_size()
-
-            if s_width == 840 and s_height == 480:
-                card_w, card_h = 56, 80
-                row_map = {0: 'H', 1: 'S', 2: 'D', 3: 'C'}
-                for row, suit in row_map.items():
-                    for col in range(2, 15):
-                        rank_num = col - 1  # 1 (Ace) to 13 (King)
-                        key = f"{suit}{rank_num}"
-                        rect = pygame.Rect(col * card_w, row * card_h, card_w, card_h)
-                        surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
-                        surf.blit(sheet, (0, 0), rect)
-                        self.sprites[key] = pygame.transform.smoothscale(surf, (75, 108))
-                
-                # Card Back (Red pattern at Col 1, Row 2)
-                back_rect = pygame.Rect(1 * card_w, 2 * card_h, card_w, card_h)
-                back_surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
-                back_surf.blit(sheet, (0, 0), back_rect)
-                self.card_back = pygame.transform.smoothscale(back_surf, (75, 108))
-            else:
-                card_w, card_h = 100, 144
-                suit_map = {0: 'C', 1: 'D', 2: 'S', 3: 'H'}
-                for row, suit in suit_map.items():
-                    for col in range(13):
-                        key = f"{suit}{col+1}"
-                        rect = pygame.Rect(col * card_w, row * card_h, card_w, card_h)
-                        surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
-                        surf.blit(sheet, (0, 0), rect)
-                        self.sprites[key] = pygame.transform.smoothscale(surf, (75, 108))
-                back_rect = pygame.Rect(14 * card_w, 2 * card_h, card_w, card_h)
-                back_surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
-                back_surf.blit(sheet, (0, 0), back_rect)
-                self.card_back = pygame.transform.smoothscale(back_surf, (75, 108))
+            suit_map = {0: 'C', 1: 'D', 2: 'S', 3: 'H'}
+            card_w, card_h = 100, 144
+            for row, suit in suit_map.items():
+                for col in range(13):
+                    key = f"{suit}{col+1}"
+                    rect = pygame.Rect(col * card_w, row * card_h, card_w, card_h)
+                    surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
+                    surf.blit(sheet, (0, 0), rect)
+                    self.sprites[key] = pygame.transform.smoothscale(surf, (75, 108))
+            
+            back_rect = pygame.Rect(14 * card_w, 2 * card_h, card_w, card_h)
+            back_surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
+            back_surf.blit(sheet, (0, 0), back_rect)
+            self.card_back = pygame.transform.smoothscale(back_surf, (75, 108))
         else:
             self.card_back = pygame.Surface((75, 108))
             self.card_back.fill((45, 75, 160))
@@ -97,7 +71,7 @@ def draw_button(surface, text, rect, base_color, mouse_pos):
 
 
 def show_rules_dialog():
-    pygame.event.clear()
+    """Displays rules dialog box."""
     dialog_open = True
     while dialog_open:
         for event in pygame.event.get():
@@ -130,11 +104,10 @@ def show_rules_dialog():
             SCREEN.blit(t_surf, (140, 110 + i * 40))
 
         pygame.display.flip()
-    pygame.event.clear()
 
 
 def show_game_over_dialog(user_score: int, ai_score: int):
-    pygame.event.clear()
+    """Displays a sleek Ubisoft-style Game Over victory / defeat screen."""
     dialog_open = True
     user_won = user_score >= 100
     
@@ -169,7 +142,6 @@ def show_game_over_dialog(user_score: int, ai_score: int):
         SCREEN.blit(t_prompt, (WIDTH // 2 - t_prompt.get_width() // 2, 460))
 
         pygame.display.flip()
-    pygame.event.clear()
 
 
 class GinRummyGUI:
@@ -178,6 +150,7 @@ class GinRummyGUI:
         self.game = Play()
 
     def main_menu(self):
+        """Ubisoft UNO-inspired sleek main menu layout."""
         clock = pygame.time.Clock()
         in_menu = True
 
@@ -203,7 +176,7 @@ class GinRummyGUI:
                     sys.exit()
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if btn_start.collidepoint(m_pos):
-                        self.game = Play()
+                        self.game = Play()  # Reset game state on new game start
                         in_menu = False
                     elif btn_rules.collidepoint(m_pos):
                         show_rules_dialog()
@@ -212,6 +185,7 @@ class GinRummyGUI:
             clock.tick(30)
 
     def run_game_loop(self):
+        """Active gameplay session UI loop with End Game Victory/Defeat overlay."""
         clock = pygame.time.Clock()
         running = True
 
@@ -220,7 +194,7 @@ class GinRummyGUI:
             SCREEN.fill(BG_DARK)
             pygame.draw.circle(SCREEN, BG_LIGHT, (WIDTH // 2, HEIGHT // 2), 420)
 
-            # Action Buttons
+            # Buttons
             btn_surrender = pygame.Rect(30, HEIGHT - 70, 140, 45)
             btn_sort = pygame.Rect(WIDTH - 180, 15, 150, 35)
             btn_knock = pygame.Rect(WIDTH - 170, HEIGHT - 70, 140, 45)
@@ -231,11 +205,13 @@ class GinRummyGUI:
 
             user_dw = self.game.user_hand.calculate_deadwood()
             
+            # Show dynamic GIN! or KNOCK Button
             if self.game.current_turn == "USER" and user_dw <= 10 and not self.game.round_over:
                 btn_label = "GIN!" if user_dw == 0 else "KNOCK"
                 btn_color = (220, 160, 20) if user_dw == 0 else BTN_BLUE
                 draw_button(SCREEN, btn_label, btn_knock, btn_color, m_pos)
 
+            # Show NEXT ROUND button when round finishes
             if self.game.round_over:
                 draw_button(SCREEN, "NEXT ROUND", btn_next, BTN_BLUE, m_pos)
 
@@ -251,7 +227,7 @@ class GinRummyGUI:
             if top_disc:
                 SCREEN.blit(self.loader.get_card(top_disc), disc_rect.topleft)
 
-            # AI Hand
+            # AI Hand (Exposed face-up when round is over)
             ai_cards = self.game.ai_hand.get_cards()
             start_x_ai = WIDTH // 2 - (len(ai_cards) * 22)
             for i, code in enumerate(ai_cards):
@@ -281,15 +257,18 @@ class GinRummyGUI:
 
             pygame.display.flip()
 
+            # Check 100+ points match end trigger
             if self.game.round_over and (self.game.user_score >= 100 or self.game.ai_score >= 100):
                 pygame.time.delay(1000)
                 show_game_over_dialog(self.game.user_score, self.game.ai_score)
                 return
 
+            # Execute AI Turn via play.py
             if self.game.current_turn == "AI" and not self.game.round_over:
                 pygame.time.delay(600)
                 self.game.execute_ai_turn()
 
+            # Input Events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
