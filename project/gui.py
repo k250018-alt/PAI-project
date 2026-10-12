@@ -106,6 +106,44 @@ def show_rules_dialog():
         pygame.display.flip()
 
 
+def show_game_over_dialog(user_score: int, ai_score: int):
+    """Displays a sleek Ubisoft-style Game Over victory / defeat screen."""
+    dialog_open = True
+    user_won = user_score >= 100
+    
+    while dialog_open:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                dialog_open = False
+
+        SCREEN.fill(BG_DARK)
+        overlay = pygame.Rect(180, 120, WIDTH - 360, HEIGHT - 240)
+        pygame.draw.rect(SCREEN, SLOT_BG, overlay, border_radius=16)
+        
+        border_color = GOLD if user_won else BTN_RED
+        pygame.draw.rect(SCREEN, border_color, overlay, 3, border_radius=16)
+
+        header_txt = "VICTORY!" if user_won else "DEFEAT!"
+        header_color = GOLD if user_won else BTN_RED
+        
+        t_header = FONT_TITLE.render(header_txt, True, header_color)
+        t_sub = FONT_LARGE.render("FINAL MATCH RESULTS", True, WHITE)
+        t_user = FONT_LARGE.render(f"YOUR SCORE: {user_score}", True, GOLD)
+        t_ai = FONT_LARGE.render(f"AI SCORE: {ai_score}", True, WHITE)
+        t_prompt = FONT_MED.render("[ Click anywhere to return to Main Menu ]", True, GOLD)
+
+        SCREEN.blit(t_header, (WIDTH // 2 - t_header.get_width() // 2, 160))
+        SCREEN.blit(t_sub, (WIDTH // 2 - t_sub.get_width() // 2, 230))
+        SCREEN.blit(t_user, (WIDTH // 2 - t_user.get_width() // 2, 310))
+        SCREEN.blit(t_ai, (WIDTH // 2 - t_ai.get_width() // 2, 360))
+        SCREEN.blit(t_prompt, (WIDTH // 2 - t_prompt.get_width() // 2, 460))
+
+        pygame.display.flip()
+
+
 class GinRummyGUI:
     def __init__(self):
         self.loader = SpriteSheetLoader(SPRITE_PATH)
@@ -138,6 +176,7 @@ class GinRummyGUI:
                     sys.exit()
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if btn_start.collidepoint(m_pos):
+                        self.game = Play()  # Reset game state on new game start
                         in_menu = False
                     elif btn_rules.collidepoint(m_pos):
                         show_rules_dialog()
@@ -146,7 +185,7 @@ class GinRummyGUI:
             clock.tick(30)
 
     def run_game_loop(self):
-        """Active gameplay session UI loop with dynamic GIN! button handling."""
+        """Active gameplay session UI loop with End Game Victory/Defeat overlay."""
         clock = pygame.time.Clock()
         running = True
 
@@ -166,13 +205,13 @@ class GinRummyGUI:
 
             user_dw = self.game.user_hand.calculate_deadwood()
             
-            # Dynamic GIN! or KNOCK Button rendering
+            # Show dynamic GIN! or KNOCK Button
             if self.game.current_turn == "USER" and user_dw <= 10 and not self.game.round_over:
                 btn_label = "GIN!" if user_dw == 0 else "KNOCK"
                 btn_color = (220, 160, 20) if user_dw == 0 else BTN_BLUE
                 draw_button(SCREEN, btn_label, btn_knock, btn_color, m_pos)
 
-            # Show NEXT ROUND button when the round finishes
+            # Show NEXT ROUND button when round finishes
             if self.game.round_over:
                 draw_button(SCREEN, "NEXT ROUND", btn_next, BTN_BLUE, m_pos)
 
@@ -188,7 +227,7 @@ class GinRummyGUI:
             if top_disc:
                 SCREEN.blit(self.loader.get_card(top_disc), disc_rect.topleft)
 
-            # AI Hand (Face-down during play, exposed face-up when round is over)
+            # AI Hand (Exposed face-up when round is over)
             ai_cards = self.game.ai_hand.get_cards()
             start_x_ai = WIDTH // 2 - (len(ai_cards) * 22)
             for i, code in enumerate(ai_cards):
@@ -218,6 +257,12 @@ class GinRummyGUI:
 
             pygame.display.flip()
 
+            # Check 100+ points match end trigger
+            if self.game.round_over and (self.game.user_score >= 100 or self.game.ai_score >= 100):
+                pygame.time.delay(1000)
+                show_game_over_dialog(self.game.user_score, self.game.ai_score)
+                return
+
             # Execute AI Turn via play.py
             if self.game.current_turn == "AI" and not self.game.round_over:
                 pygame.time.delay(600)
@@ -233,8 +278,6 @@ class GinRummyGUI:
                     elif btn_surrender.collidepoint(m_pos):
                         self.game.handle_surrender()
                     elif self.game.round_over and btn_next.collidepoint(m_pos):
-                        if self.game.user_score >= 100 or self.game.ai_score >= 100:
-                            return
                         self.game.start_new_round()
                     elif self.game.current_turn == "USER" and not self.game.round_over:
                         if btn_knock.collidepoint(m_pos) and user_dw <= 10:
