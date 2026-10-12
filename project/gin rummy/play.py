@@ -15,13 +15,12 @@ DATASET_DIR = os.path.join(os.path.dirname(__file__), "..", "dataset")
 
 class AIRandomForestEngine:
     """Random Forest ML engine trained on project CSV datasets with dynamic accuracy calculation."""
-
     def __init__(self):
         self.draw_model = Randomforest(min_split=4, depth=8, N_trees=10)
         self.discard_model = Randomforest(min_split=4, depth=8, N_trees=10)
         self.knock_model = Randomforest(min_split=4, depth=8, N_trees=10)
         self.strat_model = Randomforest(min_split=4, depth=8, N_trees=10)
-
+        
         self.draw_trained = False
         self.discard_trained = False
         self.knock_trained = False
@@ -40,10 +39,10 @@ class AIRandomForestEngine:
                 X = df.drop(columns=["take_discard"]).values[:400]
                 y = df["take_discard"].values[:400]
                 split = int(len(X) * 0.8)
-
+                
                 self.draw_model.fit(X[:split], y[:split])
                 self.draw_trained = True
-
+                
                 acc = self.draw_model.check_accuracy(X[split:], y[split:])
                 accuracies.append(acc)
         except Exception as e:
@@ -57,10 +56,10 @@ class AIRandomForestEngine:
                 X = df.drop(columns=["best_discard"]).values[:400]
                 y = df["best_discard"].values[:400]
                 split = int(len(X) * 0.8)
-
+                
                 self.discard_model.fit(X[:split], y[:split])
                 self.discard_trained = True
-
+                
                 acc = self.discard_model.check_accuracy(X[split:], y[split:])
                 accuracies.append(acc)
         except Exception as e:
@@ -74,10 +73,10 @@ class AIRandomForestEngine:
                 X = df.drop(columns=["decision"]).values[:400]
                 y = df["decision"].values[:400]
                 split = int(len(X) * 0.8)
-
+                
                 self.knock_model.fit(X[:split], y[:split])
                 self.knock_trained = True
-
+                
                 acc = self.knock_model.check_accuracy(X[split:], y[split:])
                 accuracies.append(acc)
         except Exception as e:
@@ -88,16 +87,16 @@ class AIRandomForestEngine:
             p_strat = os.path.join(DATASET_DIR, "run_vs_set_decision_dataset.csv")
             if not os.path.exists(p_strat):
                 p_strat = os.path.join(os.path.dirname(__file__), "..", "run_vs_set_decision_dataset.csv")
-
+                
             if os.path.exists(p_strat):
                 df = pd.read_csv(p_strat).dropna()
                 X_s = df.drop(columns=["prioritization_choice"]).values[:400]
                 y_s = df["prioritization_choice"].values[:400]
                 split = int(len(X_s) * 0.8)
-
+                
                 self.strat_model.fit(X_s[:split], y_s[:split])
                 self.strat_trained = True
-
+                
                 acc = self.strat_model.check_accuracy(X_s[split:], y_s[split:])
                 accuracies.append(acc)
         except Exception as e:
@@ -114,14 +113,13 @@ class AIRandomForestEngine:
         dw_now = sum(min(int(c[1:]), 10) for c in hand_cards)
         top_num = int(top_discard[1:])
         top_suit = top_discard[0]
-
+        
         same_num = sum(1 for c in hand_cards if int(c[1:]) == top_num)
         adj1 = sum(1 for c in hand_cards if c[0] == top_suit and int(c[1:]) == top_num - 1)
         adj2 = sum(1 for c in hand_cards if c[0] == top_suit and int(c[1:]) == top_num + 1)
         dw_gain = max(0, dw_now - sum(min(int(c[1:]), 10) for c in hand_cards + [top_discard]))
 
-        features = np.array(
-            [[turn_num, deck_size, dw_now, 0, 0, len(hand_cards), 0, 0, top_num, same_num, adj1, adj2, dw_gain]])
+        features = np.array([[turn_num, deck_size, dw_now, 0, 0, len(hand_cards), 0, 0, top_num, same_num, adj1, adj2, dw_gain]])
         return bool(self.draw_model.predict(features)[0] == 1)
 
     def predict_discard(self, hand_cards: list, turn_num: int) -> str:
@@ -140,8 +138,7 @@ class AIRandomForestEngine:
             adj2 = sum(1 for c in hand_cards if c != card and c[0] == c_suit and int(c[1:]) == c_num + 1)
             dw_red = min(c_num, 10)
 
-            features = np.array(
-                [[turn_num, base_dw, base_dw - dw_red, c_num, 0, 0, same_num, adj1, adj2, dw_red, 0, 0, 0, 0, 0]])
+            features = np.array([[turn_num, base_dw, base_dw - dw_red, c_num, 0, 0, same_num, adj1, adj2, dw_red, 0, 0, 0, 0, 0]])
             pred = self.discard_model.predict(features)[0]
             if pred > best_score:
                 best_score = pred
@@ -153,7 +150,7 @@ class AIRandomForestEngine:
         if real_deadwood > 10:
             return False  # Standard Gin Rummy Rule: Cannot knock if deadwood > 10
         if not self.knock_trained:
-            return True  # Valid knock threshold met
+            return True   # Valid knock threshold met
 
         features = np.array([[turn_num, deck_size, real_deadwood, 0, 0, len(hand_cards), 10, 0, 0, 0.0, 0.8, 0.2]])
         return bool(self.knock_model.predict(features)[0] == 1)
@@ -186,7 +183,7 @@ class Sorter:
             group = [numbers[0]]
             best, worst = [], []
             for i in range(1, len(numbers)):
-                if numbers[i] == numbers[i - 1] + 1:
+                if numbers[i] == numbers[i-1] + 1:
                     group.append(numbers[i])
                 else:
                     (best if len(group) >= 3 else worst).extend(group)
@@ -230,7 +227,7 @@ class Hands:
         valid_runs, invalid_runs = self.__sorter.find_runs(self.__cards)
         unmelded = [card for group in invalid_runs.values() for card in group]
         valid_suits, invalid_suits = self.__sorter.find_suits(unmelded)
-
+        
         melded_runs = [c for grp in valid_runs.values() for c in grp]
         melded_sets = [c for grp in valid_suits.values() for c in grp]
         deadwood = [c for grp in invalid_suits.values() for c in grp]
@@ -264,7 +261,6 @@ class DiscardPile:
 
 class Play:
     """Master Game Logic & Turn Execution State Manager."""
-
     def __init__(self):
         self.ai_engine = AIRandomForestEngine()
         self.user_hand = Hands()
