@@ -149,6 +149,8 @@ class AIRandomForestEngine:
         """Evaluates whether AI should Knock or go Gin based on real melded deadwood."""
         if real_deadwood > 10:
             return False  # Standard Gin Rummy Rule: Cannot knock if deadwood > 10
+        if real_deadwood == 0:
+            return True   # Always trigger GIN immediately if deadwood is 0!
         if not self.knock_trained:
             return True   # Valid knock threshold met
 
@@ -374,15 +376,22 @@ class Play:
         sort_strat = self.ai_engine.predict_sort_strategy(self.ai_hand.get_cards(), self.turn_number)
         self.ai_hand.sort_cards_by_mode(sort_strat)
 
-        # 4. Random Forest Knock / Gin Decision using actual calculated melded deadwood
+        # 4. Check AI Deadwood after discard
         ai_dw = self.ai_hand.calculate_deadwood()
+
+        # 5. Execute GIN immediately if AI Deadwood == 0
+        if ai_dw == 0:
+            user_dw = self.user_hand.calculate_deadwood()
+            bonus = user_dw + 25
+            self.ai_score += bonus
+            self.status_msg = f"GIN! AI scored {bonus} pts!"
+            self.round_over = True
+            return
+
+        # 6. Execute Knock if AI Deadwood <= 10 and Model approves
         if self.ai_engine.predict_knock(ai_dw, self.ai_hand.get_cards(), self.turn_number, self.deck_remaining):
             user_dw = self.user_hand.calculate_deadwood()
-            if ai_dw == 0:
-                bonus = user_dw + 25
-                self.ai_score += bonus
-                self.status_msg = f"GIN! AI scored {bonus} pts!"
-            elif ai_dw < user_dw:
+            if ai_dw < user_dw:
                 diff = user_dw - ai_dw
                 self.ai_score += diff
                 self.status_msg = f"AI Knocked! AI scored {diff} pts."
