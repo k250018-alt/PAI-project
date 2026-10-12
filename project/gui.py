@@ -28,9 +28,9 @@ FONT_MED = pygame.font.SysFont("Trebuchet MS", 20, bold=True)
 FONT_SMALL = pygame.font.SysFont("Trebuchet MS", 15, bold=True)
 
 SPRITE_PATH = os.path.join(
-    BASE_DIR,
-    "CuteCards - asset pack 0.1update",
-    "CuteCards - asset pack",
+    BASE_DIR, 
+    "CuteCards - asset pack 0.1update", 
+    "CuteCards - asset pack", 
     "CuteCards.png"
 )
 
@@ -44,12 +44,12 @@ class SpriteSheetLoader:
             card_w, card_h = 100, 144
             for row, suit in suit_map.items():
                 for col in range(13):
-                    key = f"{suit}{col + 1}"
+                    key = f"{suit}{col+1}"
                     rect = pygame.Rect(col * card_w, row * card_h, card_w, card_h)
                     surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
                     surf.blit(sheet, (0, 0), rect)
                     self.sprites[key] = pygame.transform.smoothscale(surf, (75, 108))
-
+            
             back_rect = pygame.Rect(14 * card_w, 2 * card_h, card_w, card_h)
             back_surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
             back_surf.blit(sheet, (0, 0), back_rect)
@@ -63,8 +63,7 @@ class SpriteSheetLoader:
 
 
 def draw_button(surface, text, rect, base_color, mouse_pos):
-    color = (min(base_color[0] + 30, 255), min(base_color[1] + 30, 255),
-             min(base_color[2] + 30, 255)) if rect.collidepoint(mouse_pos) else base_color
+    color = (min(base_color[0]+30, 255), min(base_color[1]+30, 255), min(base_color[2]+30, 255)) if rect.collidepoint(mouse_pos) else base_color
     pygame.draw.rect(surface, color, rect, border_radius=10)
     pygame.draw.rect(surface, GOLD, rect, 2, border_radius=10)
     txt_surf = FONT_MED.render(text, True, WHITE)
@@ -166,7 +165,7 @@ class GinRummyGUI:
             draw_button(SCREEN, f"SORT: {self.game.user_sort_mode}", btn_sort, BTN_BLUE, m_pos)
 
             user_dw = self.game.user_hand.calculate_deadwood()
-
+            
             # Show KNOCK button during user's turn if deadwood <= 10
             if self.game.current_turn == "USER" and user_dw <= 10 and not self.game.round_over:
                 draw_button(SCREEN, "KNOCK", btn_knock, BTN_BLUE, m_pos)
@@ -205,7 +204,7 @@ class GinRummyGUI:
 
             # HUD Display
             hud = FONT_MED.render(
-                f"YOU: {self.game.user_score} PTS | AI: {self.game.ai_score} PTS | AI Acc: {self.game.ai_engine.accuracy:.1f}%",
+                f"YOU: {self.game.user_score} PTS | AI: {self.game.ai_score} PTS | AI Acc: {self.game.ai_engine.accuracy:.1f}%", 
                 True, GOLD
             )
             dw_txt = FONT_SMALL.render(f"Your Deadwood: {user_dw}", True, WHITE)
