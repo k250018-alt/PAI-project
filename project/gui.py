@@ -146,7 +146,7 @@ class GinRummyGUI:
             clock.tick(30)
 
     def run_game_loop(self):
-        """Active gameplay session UI loop with Next Round recovery."""
+        """Active gameplay session UI loop with dynamic GIN! button handling."""
         clock = pygame.time.Clock()
         running = True
 
@@ -166,9 +166,11 @@ class GinRummyGUI:
 
             user_dw = self.game.user_hand.calculate_deadwood()
             
-            # Show KNOCK button during user's turn if deadwood <= 10
+            # Dynamic GIN! or KNOCK Button rendering
             if self.game.current_turn == "USER" and user_dw <= 10 and not self.game.round_over:
-                draw_button(SCREEN, "KNOCK", btn_knock, BTN_BLUE, m_pos)
+                btn_label = "GIN!" if user_dw == 0 else "KNOCK"
+                btn_color = (220, 160, 20) if user_dw == 0 else BTN_BLUE
+                draw_button(SCREEN, btn_label, btn_knock, btn_color, m_pos)
 
             # Show NEXT ROUND button when the round finishes
             if self.game.round_over:
@@ -186,7 +188,7 @@ class GinRummyGUI:
             if top_disc:
                 SCREEN.blit(self.loader.get_card(top_disc), disc_rect.topleft)
 
-            # AI Hand (Expose AI cards face-up when round is over)
+            # AI Hand (Face-down during play, exposed face-up when round is over)
             ai_cards = self.game.ai_hand.get_cards()
             start_x_ai = WIDTH // 2 - (len(ai_cards) * 22)
             for i, code in enumerate(ai_cards):
