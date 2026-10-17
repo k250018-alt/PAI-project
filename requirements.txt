@@ -1,0 +1,4 @@
+pygame-ce
+pandas
+numpy
+matplotlib
