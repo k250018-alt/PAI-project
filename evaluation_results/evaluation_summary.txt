@@ -1,0 +1,55 @@
+======================================================================
+   GIN RUMMY AI — MODEL EVALUATION SUMMARY REPORT
+======================================================================
+
+1. DRAW MODEL (Binary: Deck vs Take Discard)
+--------------------------------------------------
+  Random Forest              Acc=97.5%  P=95.3%  R=88.7%  F1=91.9%
+  Always Deck                Acc=84.0%
+  DW Drop Rule               Acc=85.0%
+
+2. DISCARD MODEL (Binary: Best Card to Discard)
+--------------------------------------------------
+  Random Forest              Acc=97.2%
+  Random                     Acc=49.7%
+  Highest Card               Acc=86.6%
+  Lowest Deadwood            Acc=39.8%
+
+3. KNOCK/GIN MODEL (3-class: Continue/Knock/Gin)
+--------------------------------------------------
+  Random Forest              Acc=83.2%  BalAcc=66.9%  MacroF1=64.2%
+  Always Knock               Acc=83.3%  BalAcc=66.7%  MacroF1=63.6%
+
+4. WIN-RATE SIMULATION
+--------------------------------------------------
+  AI vs Random:
+    AI Wins              = 999
+    Opp Wins             = 1
+    Draws                = 0
+    AI Win Rate          = 99.9%
+    Avg AI Deadwood      = 6.7
+    Avg Opp Deadwood     = 58.5
+    Avg Turns/Game       = 8.1
+
+  AI vs Greedy:
+    AI Wins              = 526
+    Opp Wins             = 474
+    Draws                = 0
+    AI Win Rate          = 52.6%
+    Avg AI Deadwood      = 14.5
+    Avg Opp Deadwood     = 16.7
+    Avg Turns/Game       = 6.5
+
+
+5. GENERATED CHARTS
+--------------------------------------------------
+  - draw_confusion_matrix.png
+  - draw_feature_importance.png
+  - discard_confusion_matrix.png
+  - discard_feature_importance.png
+  - knock_confusion_matrix.png
+  - knock_feature_importance.png
+  - win_rate_comparison.png
+
+======================================================================
+End of Report
