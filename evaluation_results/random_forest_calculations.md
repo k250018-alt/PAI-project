@@ -34,34 +34,6 @@ To prevent individual decision trees from overfitting and to decorrelate the ens
 
 $$\hat{Y}(\mathbf{x}) = \arg\max_{c \in C} \sum_{t=1}^{N_{\text{trees}}} \mathbb{I}\left(h_t(\mathbf{x}) = c\right)$$
 
----
-
-## 2. Decision 1 Calculation Trace: Draw Decision (Deck vs Discard)
-
-### 2.1 Concrete Scenario
-* **AI Current Hand (10 cards)**: `S4, S7, D7, S8, H8, S10, H4, H5, H6, S13`
-* **Top Discard Card**: `C7` (Rank 7, Suit C)
-* **Game State**: Turn 4, Deck Remaining = 28 cards
-
-### 2.2 Feature Vector Extraction
-| Feature | Name | Formula / Derivation | Computed Value |
-|---------|------|----------------------|----------------|
-| $x_0$ | `turn_num` | Elapsed turn index | `4` |
-| $x_1$ | `deck_size` | Remaining cards in draw stock | `28` |
-| $x_2$ | `current_dw` | Sorter.calculate_deadwood(hand) | `54` |
-| $x_3$ | `best_dw_with_discard` | $\min (\text{DW})$ with discard | `30` |
-| $x_4$ | `dw_gain` | $\max(0, x_2 - x_3)$ (Deadwood reduced) | `24` |
-| $x_5$ | `top_num` | Numeric rank of discard card (`C7` $\rightarrow 7$) | `7` |
-| $x_6$ | `same_num` | Count of cards in hand with rank 7 (`S7`, `D7`) | `2` |
-| $x_7$ | `adj1` | Cards in hand of Clubs with rank $7 \pm 1$ ($6$ or $8$) | `0` |
-| $x_8$ | `adj2` | Cards in hand of Clubs with rank $7 \pm 2$ ($5$ or $9$) | `0` |
-| $x_9$ | `num_sets` | Completed 3/4-of-a-kind sets | `0` |
-| $x_{10}$ | `num_seqs` | Completed 3+ card suit sequences (`H4-H5-H6`) | `3` |
-| $x_{11}$ | `num_unmelded` | Cards not part of any meld | `7` |
-| $x_{12}$ | `highest_unmelded` | Max deadwood value among unmelded cards (`S13` $\rightarrow 10$) | `10` |
-
-$$\mathbf{x}_{\text{draw}} = [4, 28, 54, 30, 24, 7, 2, 0, 0, 0, 3, 7, 10]$$
-
 ### 1.4 Step-by-Step Numerical Example of Information Gain
 Consider a parent node with 10 training samples: 7 labeled `Deck (0)` and 3 labeled `Take Discard (1)`:
 
