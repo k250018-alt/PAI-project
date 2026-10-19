@@ -81,6 +81,8 @@ Consider a parent node with 10 training samples: 7 labeled `Deck (0)` and 3 labe
 
 Since $IG = 0.5568 > 0$, this split significantly reduces uncertainty and is selected as a branch node in the decision tree.
 
+![Shannon Entropy and Tree Split Architecture](rf_entropy_split_visualization.png)
+
 ---
 
 ## 2. Decision 1 Calculation Trace: Draw Decision (Deck vs Discard)
@@ -163,6 +165,8 @@ $$\mathbf{x}_{\text{draw}} = [4, 28, 54, 30, 24, 7, 2, 0, 0, 0, 3, 7, 10]$$
 * **Ensemble Formula**: $\hat{Y} = \arg\max(V_0=2, V_1=8) = 1$
 * **Final Executed Action**: **TAKE DISCARD** (Forms a 3-of-a-kind with `S7` and `D7`!)
 
+![Random Forest Ensemble Voting Trace](rf_ensemble_majority_voting.png)
+
 ---
 
 ## 3. Decision 2 Calculation Trace: Discard Selection (11 Cards Candidate Scoring)
@@ -182,11 +186,11 @@ Where:
 ### 3.2 Evaluation Table Across All 11 Cards
 | Card | Rank | In Meld? | DW After | DW Reduction | Pairs/Conn | ML Vote | Final Score | Action |
 |------|------|----------|----------|--------------|------------|---------|-------------|--------|
-| `S4` | 4 | NO | 36 | 4 | 1/0 | 0 | **1604** | ★ CHOSEN |
+| `S4` | 4 | NO | 36 | 4 | 1/0 | 0 | **1604** | Keep |
 | `S7` | 7 | YES | 54 | -14 | 2/1 | 0 | **-3854** | Keep |
 | `D7` | 7 | YES | 54 | -14 | 2/0 | 0 | **-3846** | Keep |
-| `S8` | 8 | NO | 32 | 8 | 1/1 | 1 | **1752** | ★ CHOSEN |
-| `H8` | 8 | NO | 32 | 8 | 1/0 | 1 | **1760** | ★ CHOSEN |
+| `S8` | 8 | NO | 32 | 8 | 1/1 | 1 | **1752** | Keep |
+| `H8` | 8 | NO | 32 | 8 | 1/0 | 1 | **1760** | Keep |
 | `S10` | 10 | NO | 30 | 10 | 0/0 | 1 | **1830** | ★ CHOSEN |
 | `H4` | 4 | YES | 51 | -11 | 1/1 | 0 | **-3779** | Keep |
 | `H5` | 5 | YES | 50 | -10 | 0/2 | 1 | **-3706** | Keep |
@@ -196,6 +200,8 @@ Where:
 
 **Discard Decision Result**: The AI selected **`S10`** (Score = **1830**).
 High-deadwood isolated card `S10` (10 deadwood points) is discarded while completely preserving the `H4-H5-H6` sequence and `S7-D7-C7` 3-of-a-kind set!
+
+![11-Card Discard Candidate Scoring Breakdown](rf_discard_scoring_visualization.png)
 
 ---
 
