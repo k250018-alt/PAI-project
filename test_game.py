@@ -189,5 +189,48 @@ class TestAIEngineBehavior(unittest.TestCase):
         self.assertTrue(should_draw)
 
 
+class TestHandSorting(unittest.TestCase):
+    """Tests for hand sorting modes: AUTO, RUNS (suit), SETS (pairs/ranks), RANK."""
+    def test_sort_by_rank(self):
+        hand = Hands()
+        for c in ['S13', 'H4', 'D7', 'S4', 'H6', 'D1']:
+            hand.put_in_hand(c)
+        sorted_cards = hand.sort_cards_by_mode("RANK")
+        # Should be sorted strictly by rank in ascending order: 1, 4, 4, 6, 7, 13
+        ranks = [int(c[1:]) for c in sorted_cards]
+        self.assertEqual(ranks, sorted(ranks))
+
+    def test_sort_by_runs(self):
+        hand = Hands()
+        for c in ['H4', 'S10', 'H6', 'S4', 'D7', 'H5']:
+            hand.put_in_hand(c)
+        sorted_cards = hand.sort_cards_by_mode("RUNS")
+        # Spades first in rank order, then Hearts in rank order, then Diamonds
+        self.assertEqual(sorted_cards, ['S4', 'S10', 'H4', 'H5', 'H6', 'D7'])
+
+    def test_sort_by_sets(self):
+        hand = Hands()
+        # Two 4s, three 7s, one King (13)
+        for c in ['S13', 'H4', 'D7', 'S4', 'S7', 'C7']:
+            hand.put_in_hand(c)
+        sorted_cards = hand.sort_cards_by_mode("SETS")
+        # 3-of-a-kind (7s) first, then pair (4s), then singleton (13)
+        self.assertEqual(sorted_cards[:3], ['S7', 'C7', 'D7'])
+        self.assertEqual(sorted_cards[3:5], ['S4', 'H4'])
+        self.assertEqual(sorted_cards[5], 'S13')
+
+    def test_cycle_sort_mode(self):
+        game = Play()
+        self.assertEqual(game.user_sort_mode, "AUTO")
+        game.cycle_sort_mode()
+        self.assertEqual(game.user_sort_mode, "RUNS")
+        game.cycle_sort_mode()
+        self.assertEqual(game.user_sort_mode, "SETS")
+        game.cycle_sort_mode()
+        self.assertEqual(game.user_sort_mode, "RANK")
+        game.cycle_sort_mode()
+        self.assertEqual(game.user_sort_mode, "AUTO")
+
+
 if __name__ == "__main__":
     unittest.main()

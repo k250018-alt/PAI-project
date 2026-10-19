@@ -402,38 +402,61 @@ class Hands:
         return best_card, min_dw
 
     def sort_cards_by_mode(self, mode: str = "AUTO") -> list:
+        if not self.__cards:
+            return []
+
+        suit_order = {'S': 0, 'H': 1, 'C': 2, 'D': 3}
+
         if mode == "RANK":
-            self.__cards.sort(key=lambda c: (int(c[1:]), c[0]))
+            # Pure rank sort in ascending order (1 to 13), secondary by suit
+            self.__cards.sort(key=lambda c: (int(c[1:]), suit_order.get(c[0], 0)))
             return list(self.__cards)
 
-        # Method 1: Sets first, then Seqs
-        valid_sets1, invalid_sets1 = self.__sorter.find_runs(self.__cards)
-        rem1 = [c for grp in invalid_sets1.values() for c in grp]
-        valid_seqs1, invalid_seqs1 = self.__sorter.find_suits(rem1)
-        deadwood1 = [c for grp in invalid_seqs1.values() for c in grp]
-        dw1 = sum(min(int(c[1:]), 10) for c in deadwood1)
+        elif mode == "RUNS":
+            # Group strictly by Suit, and order by Rank within each suit (Spades, Hearts, Clubs, Diamonds)
+            # This makes all potential and completed runs/sequences immediately obvious!
+            self.__cards.sort(key=lambda c: (suit_order.get(c[0], 0), int(c[1:])))
+            return list(self.__cards)
 
-        # Method 2: Seqs first, then Sets
-        valid_seqs2, invalid_seqs2 = self.__sorter.find_suits(self.__cards)
-        rem2 = [c for grp in invalid_seqs2.values() for c in grp]
-        valid_sets2, invalid_sets2 = self.__sorter.find_runs(rem2)
-        deadwood2 = [c for grp in invalid_sets2.values() for c in grp]
-        dw2 = sum(min(int(c[1:]), 10) for c in deadwood2)
+        elif mode == "SETS":
+            # Group cards by Rank so pairs, 3-of-a-kinds, and 4-of-a-kinds are side-by-side
+            rank_counts = {}
+            for c in self.__cards:
+                r = int(c[1:])
+                rank_counts[r] = rank_counts.get(r, 0) + 1
+            # Sort by frequency (highest counts first: sets, then pairs, then singles), then rank, then suit
+            self.__cards.sort(key=lambda c: (-rank_counts[int(c[1:])], int(c[1:]), suit_order.get(c[0], 0)))
+            return list(self.__cards)
 
-        if mode == "SETS" or (mode == "AUTO" and dw1 <= dw2):
-            melded_sets = [c for grp in valid_sets1.values() for c in grp]
-            melded_seqs = [c for grp in valid_seqs1.values() for c in grp]
-            dw = deadwood1
-            dw.sort(key=lambda c: (int(c[1:]), c[0]))
-            self.__cards = melded_sets + melded_seqs + dw
-        else:  # "RUNS" or (mode == "AUTO" and dw2 < dw1)
-            melded_seqs = [c for grp in valid_seqs2.values() for c in grp]
-            melded_sets = [c for grp in valid_sets2.values() for c in grp]
-            dw = deadwood2
-            dw.sort(key=lambda c: (int(c[1:]), c[0]))
-            self.__cards = melded_seqs + melded_sets + dw
+        else:  # "AUTO"
+            # Optimal meld sorting: finds optimal meld configuration (minimizing deadwood)
+            # Puts melded cards first (Sets and Runs), then unmelded deadwood sorted by rank
+            v_sets1, inv_sets1 = self.__sorter.find_runs(self.__cards)
+            rem1 = [c for grp in inv_sets1.values() for c in grp]
+            v_seqs1, inv_seqs1 = self.__sorter.find_suits(rem1)
+            deadwood1 = [c for grp in inv_seqs1.values() for c in grp]
+            dw1 = sum(min(int(c[1:]), 10) for c in deadwood1)
 
-        return list(self.__cards)
+            v_seqs2, inv_seqs2 = self.__sorter.find_suits(self.__cards)
+            rem2 = [c for grp in inv_seqs2.values() for c in grp]
+            v_sets2, inv_sets2 = self.__sorter.find_runs(rem2)
+            deadwood2 = [c for grp in inv_sets2.values() for c in grp]
+            dw2 = sum(min(int(c[1:]), 10) for c in deadwood2)
+
+            if dw1 <= dw2:
+                melded_sets = [c for grp in v_sets1.values() for c in grp]
+                melded_seqs = [c for grp in v_seqs1.values() for c in grp]
+                dw = deadwood1
+                dw.sort(key=lambda c: (int(c[1:]), suit_order.get(c[0], 0)))
+                self.__cards = melded_sets + melded_seqs + dw
+            else:
+                melded_seqs = [c for grp in v_seqs2.values() for c in grp]
+                melded_sets = [c for grp in v_sets2.values() for c in grp]
+                dw = deadwood2
+                dw.sort(key=lambda c: (suit_order.get(c[0], 0), int(c[1:])))
+                self.__cards = melded_seqs + melded_sets + dw
+
+            return list(self.__cards)
 
 
 class DiscardPile:

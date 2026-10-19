@@ -491,6 +491,15 @@ class GinRummyGUI:
                     glow_color = (255, 215, 0, 30) if m_pos[1] > HAND_ZONE_Y else (255, 255, 255, 15)
                     hand_highlight.fill(glow_color)
                     game_surf.blit(hand_highlight, (0, HEIGHT - 200))
+                    # Visual feedback when hovering card back over its source slot to place it back
+                    if drag_source == "deck" and deck_rect.inflate(20, 20).collidepoint(m_pos):
+                        return_glow = pygame.Surface((75 + 10, 108 + 10), pygame.SRCALPHA)
+                        return_glow.fill((255, 215, 0, 80))
+                        game_surf.blit(return_glow, (deck_rect.x - 5, deck_rect.y - 5))
+                    elif drag_source == "discard" and disc_rect.inflate(20, 20).collidepoint(m_pos):
+                        return_glow = pygame.Surface((75 + 10, 108 + 10), pygame.SRCALPHA)
+                        return_glow.fill((255, 215, 0, 80))
+                        game_surf.blit(return_glow, (disc_rect.x - 5, disc_rect.y - 5))
 
             # Render Active Flying Animations
             for anim in self.active_animations[:]:
@@ -597,22 +606,23 @@ class GinRummyGUI:
                     running = False
 
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    click_pos = event.pos
                     # Button clicks (non-drag)
-                    if btn_sort.collidepoint(m_pos):
+                    if btn_sort.collidepoint(click_pos):
                         self.sounds.play("click")
                         self.game.cycle_sort_mode()
-                    elif btn_theme.collidepoint(m_pos):
+                    elif btn_theme.collidepoint(click_pos):
                         self.cycle_theme()
-                    elif btn_music_game.collidepoint(m_pos):
+                    elif btn_music_game.collidepoint(click_pos):
                         self.sounds.play("click")
                         self.sounds.toggle_music()
-                    elif btn_surrender.collidepoint(m_pos):
+                    elif btn_surrender.collidepoint(click_pos):
                         self.sounds.play("click")
                         self.game.handle_surrender()
-                    elif self.game.round_over and btn_next.collidepoint(m_pos):
+                    elif self.game.round_over and btn_next.collidepoint(click_pos):
                         self.sounds.play("click")
                         self.game.start_new_round()
-                    elif can_knock and btn_knock.collidepoint(m_pos):
+                    elif can_knock and btn_knock.collidepoint(click_pos):
                         if user_dw == 0:
                             self.sounds.play("gin")
                             self.shake.start(duration_ms=650, intensity=18)
@@ -626,68 +636,85 @@ class GinRummyGUI:
                     elif (self.game.current_turn == "USER" and not self.game.round_over 
                           and self.game.current_phase == "DISCARD"):
                         for rect, code in reversed(card_rects):
-                            if rect.collidepoint(m_pos):
+                            if rect.collidepoint(click_pos):
                                 dragging = True
                                 drag_card_code = code
                                 drag_source = "hand"
                                 drag_origin = rect.topleft
-                                drag_offset = (m_pos[0] - rect.x, m_pos[1] - rect.y)
+                                drag_offset = (click_pos[0] - rect.x, click_pos[1] - rect.y)
                                 drag_is_face_up = True
                                 break
 
                     # Start drag from deck or discard pile (DRAW phase)
                     elif (self.game.current_turn == "USER" and not self.game.round_over 
                           and self.game.current_phase == "DRAW"):
-                        if deck_rect.collidepoint(m_pos) and self.game.deck_remaining > 0:
+                        if deck_rect.collidepoint(click_pos) and self.game.deck_remaining > 0:
                             dragging = True
                             drag_card_code = None  # Face-down, unknown
                             drag_source = "deck"
                             drag_origin = deck_rect.topleft
-                            drag_offset = (m_pos[0] - deck_rect.x, m_pos[1] - deck_rect.y)
+                            drag_offset = (click_pos[0] - deck_rect.x, click_pos[1] - deck_rect.y)
                             drag_is_face_up = False
-                        elif disc_rect.collidepoint(m_pos) and self.game.discard_pile.top():
+                        elif disc_rect.collidepoint(click_pos) and self.game.discard_pile.top():
                             dragging = True
                             drag_card_code = self.game.discard_pile.top()
                             drag_source = "discard"
                             drag_origin = disc_rect.topleft
-                            drag_offset = (m_pos[0] - disc_rect.x, m_pos[1] - disc_rect.y)
+                            drag_offset = (click_pos[0] - disc_rect.x, click_pos[1] - disc_rect.y)
                             drag_is_face_up = True
 
                 elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                     if dragging:
+                        drop_x = event.pos[0] - drag_offset[0]
+                        drop_y = event.pos[1] - drag_offset[1]
+
                         # Check if dropped in valid zone
                         if drag_source == "hand" and self.game.current_phase == "DISCARD":
                             # Drop on discard pile?
                             drop_zone = disc_rect.inflate(40, 40)
-                            if drop_zone.collidepoint(m_pos):
+                            if drop_zone.collidepoint(event.pos):
                                 self.sounds.play("discard")
                                 self.active_animations.append(
-                                    CardAnimation(drag_card_code, (m_pos[0] - drag_offset[0], m_pos[1] - drag_offset[1]), 
+                                    CardAnimation(drag_card_code, (drop_x, drop_y), 
                                                   disc_rect.topleft, 120, is_face_up=True))
                                 self.game.handle_user_discard(drag_card_code)
-                            # else: card snaps back (just stop dragging)
+                            else:
+                                # Snap back into player hand position
+                                self.active_animations.append(
+                                    CardAnimation(drag_card_code, (drop_x, drop_y),
+                                                  drag_origin, 120, is_face_up=True))
 
                         elif drag_source == "deck" and self.game.current_phase == "DRAW":
-                            # Drop in hand zone or click on deck
-                            if m_pos[1] > HAND_ZONE_Y or deck_rect.collidepoint(m_pos):
+                            # Only complete draw if dropped down into player's hand zone!
+                            if event.pos[1] > HAND_ZONE_Y:
                                 self.sounds.play("draw")
                                 dest_x = start_x + len(cards) * 52
-                                start_pt = (m_pos[0] - drag_offset[0], m_pos[1] - drag_offset[1]) if m_pos[1] > HAND_ZONE_Y else deck_rect.topleft
                                 self.active_animations.append(
-                                    CardAnimation(None, start_pt,
+                                    CardAnimation(None, (drop_x, drop_y),
                                                   (dest_x, HEIGHT - 180), 150, is_face_up=False))
                                 self.game.handle_user_draw_deck()
+                            else:
+                                # Hovered back over deck or let go outside hand -> Place card back onto deck!
+                                self.sounds.play("click")
+                                self.active_animations.append(
+                                    CardAnimation(None, (drop_x, drop_y),
+                                                  deck_rect.topleft, 120, is_face_up=False))
 
                         elif drag_source == "discard" and self.game.current_phase == "DRAW":
-                            # Drop in hand zone or click on discard
-                            if m_pos[1] > HAND_ZONE_Y or disc_rect.collidepoint(m_pos):
+                            # Only complete draw if dropped down into player's hand zone!
+                            if event.pos[1] > HAND_ZONE_Y:
                                 self.sounds.play("draw")
                                 dest_x = start_x + len(cards) * 52
-                                start_pt = (m_pos[0] - drag_offset[0], m_pos[1] - drag_offset[1]) if m_pos[1] > HAND_ZONE_Y else disc_rect.topleft
                                 self.active_animations.append(
-                                    CardAnimation(drag_card_code, start_pt,
+                                    CardAnimation(drag_card_code, (drop_x, drop_y),
                                                   (dest_x, HEIGHT - 180), 150, is_face_up=True))
                                 self.game.handle_user_draw_discard()
+                            else:
+                                # Hovered back over discard or let go outside hand -> Place card back onto discard pile!
+                                self.sounds.play("click")
+                                self.active_animations.append(
+                                    CardAnimation(drag_card_code, (drop_x, drop_y),
+                                                  disc_rect.topleft, 120, is_face_up=True))
 
                         # Reset drag state
                         dragging = False
