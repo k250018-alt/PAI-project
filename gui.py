@@ -15,7 +15,7 @@ try:
 except Exception:
     pass
 
-WIDTH, HEIGHT = 1150, 720
+WIDTH, HEIGHT = 1300, 720
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Gin Rummy Desktop AI")
 
@@ -28,6 +28,7 @@ GOLD = (255, 215, 0)
 WHITE = (255, 255, 255)
 BTN_GREEN = (30, 130, 55)
 BTN_DARK = (20, 80, 35)
+BTN_RED = (180, 40, 35)
 
 FONT_TITLE = pygame.font.SysFont("Trebuchet MS", 52, bold=True)
 FONT_LARGE = pygame.font.SysFont("Trebuchet MS", 28, bold=True)
@@ -221,7 +222,17 @@ def draw_button(surface, text, rect, base_color, mouse_pos):
     pygame.draw.rect(surface, (0, 0, 0, 60) if hover else (0, 40, 0), shadow_rect, border_radius=10)
     pygame.draw.rect(surface, color, rect, border_radius=10)
     pygame.draw.rect(surface, GOLD, rect, 2, border_radius=10)
+    
+    # Auto-fit text so it never exceeds button boundaries
     txt_surf = FONT_MED.render(text, True, WHITE)
+    max_w = rect.width - 16
+    if txt_surf.get_width() > max_w:
+        txt_surf = FONT_SMALL.render(text, True, WHITE)
+    if txt_surf.get_width() > max_w:
+        target_w = max_w
+        target_h = max(1, int(txt_surf.get_height() * (target_w / txt_surf.get_width())))
+        txt_surf = pygame.transform.smoothscale(txt_surf, (target_w, target_h))
+        
     surface.blit(txt_surf, (rect.centerx - txt_surf.get_width() // 2, rect.centery - txt_surf.get_height() // 2))
 
 
@@ -404,10 +415,10 @@ class GinRummyGUI:
 
             # Buttons
             btn_surrender = pygame.Rect(30, HEIGHT - 70, 140, 45)
-            btn_theme = pygame.Rect(WIDTH - 365, 15, 175, 35)
-            btn_sort = pygame.Rect(WIDTH - 180, 15, 150, 35)
+            btn_theme = pygame.Rect(WIDTH - 390, 15, 215, 36)
+            btn_sort = pygame.Rect(WIDTH - 160, 15, 130, 36)
             music_icon = "MUSIC: ON" if self.sounds.bgm_playing else "MUSIC: OFF"
-            btn_music_game = pygame.Rect(30, 60, 120, 30)
+            btn_music_game = pygame.Rect(30, 70, 120, 28)
             btn_knock = pygame.Rect(WIDTH - 170, HEIGHT - 70, 140, 45)
             btn_next = pygame.Rect(WIDTH // 2 - 100, HEIGHT - 70, 200, 45)
 
@@ -441,7 +452,8 @@ class GinRummyGUI:
             game_surf.blit(deck_label, (deck_rect.centerx - deck_label.get_width() // 2, deck_rect.bottom + 4))
             game_surf.blit(disc_label, (disc_rect.centerx - disc_label.get_width() // 2, disc_rect.bottom + 4))
 
-            if self.game.deck_remaining > 0:
+            show_deck_back = (self.game.deck_remaining > 1) if (dragging and drag_source == "deck") else (self.game.deck_remaining > 0)
+            if show_deck_back:
                 game_surf.blit(self.current_loader.card_back, deck_rect.topleft)
             top_disc = self.game.discard_pile.top()
             if top_disc and not (dragging and drag_source == "discard"):
@@ -449,14 +461,16 @@ class GinRummyGUI:
 
             # AI Hand (Exposed face-up when round is over)
             ai_cards = self.game.ai_hand.get_cards()
-            start_x_ai = WIDTH // 2 - (len(ai_cards) * 22)
+            total_ai_w = (len(ai_cards) - 1) * 38 + 75 if ai_cards else 75
+            start_x_ai = (WIDTH - total_ai_w) // 2
             for i, code in enumerate(ai_cards):
                 card_img = self.current_loader.get_card(code) if self.game.round_over else self.current_loader.card_back
-                game_surf.blit(card_img, (start_x_ai + i * 44, 35))
+                game_surf.blit(card_img, (start_x_ai + i * 38, 35))
 
             # Player Hand (skip the card being dragged)
             card_rects = []
-            start_x = WIDTH // 2 - (len(cards) * 26)
+            total_player_w = (len(cards) - 1) * 52 + 75 if cards else 75
+            start_x = (WIDTH - total_player_w) // 2
             for i, code in enumerate(cards):
                 rect = pygame.Rect(start_x + i * 52, HEIGHT - 180, 75, 108)
                 if not (dragging and drag_source == "hand" and drag_card_code == code):
@@ -491,10 +505,10 @@ class GinRummyGUI:
                     self.active_animations.remove(anim)
 
             # Render Dragged Card (on top of everything)
-            if dragging and drag_card_code:
+            if dragging:
                 drag_x = m_pos[0] - drag_offset[0]
                 drag_y = m_pos[1] - drag_offset[1]
-                card_img = self.current_loader.get_card(drag_card_code) if drag_is_face_up else self.current_loader.card_back
+                card_img = self.current_loader.get_card(drag_card_code) if (drag_is_face_up and drag_card_code) else self.current_loader.card_back
                 # Drop shadow under dragged card
                 shadow = pygame.Surface((75, 108), pygame.SRCALPHA)
                 shadow.fill((0, 0, 0, 90))
@@ -654,22 +668,24 @@ class GinRummyGUI:
                             # else: card snaps back (just stop dragging)
 
                         elif drag_source == "deck" and self.game.current_phase == "DRAW":
-                            # Drop in hand zone?
-                            if m_pos[1] > HAND_ZONE_Y:
+                            # Drop in hand zone or click on deck
+                            if m_pos[1] > HAND_ZONE_Y or deck_rect.collidepoint(m_pos):
                                 self.sounds.play("draw")
                                 dest_x = start_x + len(cards) * 52
+                                start_pt = (m_pos[0] - drag_offset[0], m_pos[1] - drag_offset[1]) if m_pos[1] > HAND_ZONE_Y else deck_rect.topleft
                                 self.active_animations.append(
-                                    CardAnimation(None, (m_pos[0] - drag_offset[0], m_pos[1] - drag_offset[1]),
+                                    CardAnimation(None, start_pt,
                                                   (dest_x, HEIGHT - 180), 150, is_face_up=False))
                                 self.game.handle_user_draw_deck()
 
                         elif drag_source == "discard" and self.game.current_phase == "DRAW":
-                            # Drop in hand zone?
-                            if m_pos[1] > HAND_ZONE_Y:
+                            # Drop in hand zone or click on discard
+                            if m_pos[1] > HAND_ZONE_Y or disc_rect.collidepoint(m_pos):
                                 self.sounds.play("draw")
                                 dest_x = start_x + len(cards) * 52
+                                start_pt = (m_pos[0] - drag_offset[0], m_pos[1] - drag_offset[1]) if m_pos[1] > HAND_ZONE_Y else disc_rect.topleft
                                 self.active_animations.append(
-                                    CardAnimation(drag_card_code, (m_pos[0] - drag_offset[0], m_pos[1] - drag_offset[1]),
+                                    CardAnimation(drag_card_code, start_pt,
                                                   (dest_x, HEIGHT - 180), 150, is_face_up=True))
                                 self.game.handle_user_draw_discard()
 
