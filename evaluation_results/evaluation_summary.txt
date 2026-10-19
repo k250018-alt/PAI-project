@@ -41,7 +41,7 @@
     Avg Turns/Game       = 6.5
 
 
-5. GENERATED CHARTS
+5. GENERATED CHARTS & DOCUMENTS
 --------------------------------------------------
   - draw_confusion_matrix.png
   - draw_feature_importance.png
@@ -50,6 +50,54 @@
   - knock_confusion_matrix.png
   - knock_feature_importance.png
   - win_rate_comparison.png
+  - random_forest_calculations.md  (Full step-by-step mathematical calculations guide)
+  - report.md                     (Full evaluation report)
+  - show_rf_calculations.py       (Executable script to trace calculations live)
+
+6. RANDOM FOREST MATHEMATICAL CALCULATION SUMMARY
+--------------------------------------------------
+  A. SHANNON ENTROPY (Impurity Measurement):
+     H(Y) = - SUM [ p(c) * log2(p(c)) ]
+     - Example: 7 Deck (0) & 3 Discard (1):
+       H(Parent) = - (0.7*log2(0.7) + 0.3*log2(0.3)) = 0.8813 bits.
+
+  B. INFORMATION GAIN (ID3 Optimal Splitting):
+     IG(Y, X_j, theta) = H(Y) - [ (|Y_L|/|Y|)*H(Y_L) + (|Y_R|/|Y|)*H(Y_R) ]
+     - Example split on (dw_gain > 4):
+       Left: 6 samples (pure Deck, H=0.0000)
+       Right: 4 samples (1 Deck, 3 Discard, H=0.8113)
+       Weighted Child Entropy = 0.3245 bits
+       IG = 0.8813 - 0.3245 = 0.5568 bits (Selected as decision node).
+
+  C. BAGGING & FEATURE SUBSAMPLING:
+     - 10 trees, each trained on bootstrap row sample (63.2% unique).
+     - 70% random feature subsampling per tree to decorrelate trees.
+
+  D. MAJORITY VOTING INFERENCE:
+     Y_pred = mode { h_1(x), h_2(x), ..., h_10(x) }
+
+  E. WORKED DECISIONS:
+     1. Draw Decision:
+        - Hand: S4, S7, D7, S8, H8, S10, H4, H5, H6, S13 | Discard: C7
+        - 13-feature vector: [4, 28, 54, 30, 24, 7, 2, 0, 0, 0, 3, 7, 10]
+        - Trees vote: 8 for Take Discard, 2 for Deck.
+        - Decision: TAKE DISCARD (Completes S7-D7-C7 3-of-a-kind).
+
+     2. Discard Decision:
+        - Evaluates all 11 candidate cards using:
+          Score = S_meld (-5000 if in meld) + 25*(100 - DW_after)
+                  + 4*min(rank, 10) - pair_penalty + 40*ML_pred
+        - Result: Discard isolated S10 (10 deadwood, Score=1830).
+
+     3. Knock/Gin Decision:
+        - 10 features: DW=30, Sets=3, Seqs=3, Unmelded=4, Gin_Chance=0.0
+        - Rules: If DW=0 -> GIN; If 1<=DW<=4 -> Knock; If 5<=DW<=10 -> ML Check.
+        - Result: DW=30 (>10) -> CONTINUE playing to reduce deadwood.
+
+  * For the complete detailed formulas, tree node branch traces, and tables,
+    see: evaluation_results/random_forest_calculations.md
+  * To run the calculation trace live in terminal:
+    python show_rf_calculations.py
 
 ======================================================================
 End of Report
