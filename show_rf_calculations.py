@@ -1,15 +1,6 @@
-"""
-show_rf_calculations.py
-Demonstrates the exact mathematical calculations of the Random Forest models
-for Gin Rummy AI across all three game decisions:
-  1. Draw Decision (Deck vs Discard)
-  2. Discard Decision (Optimal card to discard from 11 cards)
-  3. Knock/Gin Decision (Continue vs Knock vs Gin)
-
-Does NOT modify any model files. Generates a comprehensive mathematical report
-in evaluation_results/random_forest_calculations.md and prints a formatted
-calculation trace to console.
-"""
+# show_rf_calculations.py
+# Shows the step-by-step math of how our Random Forest models make decisions
+# Generates a report in evaluation_results/random_forest_calculations.md
 
 import os
 import sys
@@ -28,7 +19,6 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 def calculate_entropy(y):
-    """Calculates Shannon Entropy H(Y) in bits."""
     if len(y) <= 1:
         return 0.0
     values, counts = np.unique(y, return_counts=True)
@@ -37,7 +27,6 @@ def calculate_entropy(y):
 
 
 def calculate_info_gain(parent_y, left_y, right_y):
-    """Calculates Information Gain IG = H(Parent) - [ (|L|/|P|)*H(L) + (|R|/|P|)*H(R) ]."""
     n_p = len(parent_y)
     if n_p == 0:
         return 0.0
@@ -49,9 +38,9 @@ def calculate_info_gain(parent_y, left_y, right_y):
 
 
 def trace_tree_prediction(tree_dict, x_sub, feature_names, tree_cols, depth=0):
-    """Traces step-by-step path taken by a sample down a decision tree."""
+    # follows a sample down one decision tree and shows each step
     if tree_dict.get("Leaf"):
-        return [f"{'  ' * depth}└─> [LEAF NODE] Vote Class = {tree_dict['Class']}"], tree_dict["Class"]
+        return [f"{'  ' * depth}└-> [LEAF NODE] Vote Class = {tree_dict['Class']}"], tree_dict["Class"]
 
     atr_idx = tree_dict["Atr"]
     orig_feat_idx = tree_cols[atr_idx] if atr_idx < len(tree_cols) else atr_idx
@@ -61,10 +50,10 @@ def trace_tree_prediction(tree_dict, x_sub, feature_names, tree_cols, depth=0):
 
     lines = []
     if curr_val > split_val:
-        lines.append(f"{'  ' * depth}├─ Condition: ({feat_name} = {curr_val:.2f}) > {split_val:.2f}  --> Go RIGHT")
+        lines.append(f"{'  ' * depth}|- Condition: ({feat_name} = {curr_val:.2f}) > {split_val:.2f}  --> Go RIGHT")
         sub_lines, vote = trace_tree_prediction(tree_dict["Right"], x_sub, feature_names, tree_cols, depth + 1)
     else:
-        lines.append(f"{'  ' * depth}├─ Condition: ({feat_name} = {curr_val:.2f}) <= {split_val:.2f} --> Go LEFT")
+        lines.append(f"{'  ' * depth}|- Condition: ({feat_name} = {curr_val:.2f}) <= {split_val:.2f} --> Go LEFT")
         sub_lines, vote = trace_tree_prediction(tree_dict["Left"], x_sub, feature_names, tree_cols, depth + 1)
 
     lines.extend(sub_lines)
@@ -94,41 +83,40 @@ def generate_rf_calculations_report():
 
     report = []
     report.append("# Random Forest Mathematical Calculations & Decision Engine Guide")
-    report.append("\nThis document provides the mathematical equations, algorithms, and worked calculation traces for each of the three Random Forest decision models in the Gin Rummy AI system.\n")
+    report.append("\nThis document shows the math and decision traces for the three Random Forest models in our Gin Rummy AI.\n")
 
-    # =========================================================================
-    # SECTION 1: MATHEMATICAL FOUNDATIONS
-    # =========================================================================
-    report.append("## 1. Mathematical Foundations of the Random Forest Architecture\n")
-    report.append("The AI employs an ensemble of **ID3 Decision Trees with Bagging (Bootstrap Aggregation)**. Each decision is computed mathematically through Shannon Entropy, Information Gain optimization, random feature subsampling, and majority voting.\n")
+    report.append("## 1. Mathematical Foundations\n")
+    report.append("The AI uses an ensemble of ID3 Decision Trees with Bagging. Each decision uses Shannon Entropy, Information Gain, and majority voting.\n")
 
     report.append("### 1.1 Shannon Entropy")
-    report.append("Shannon entropy measures the impurity or uncertainty of target labels $Y$ in a dataset with classes $C$:\n")
+    report.append("Shannon entropy measures how mixed (impure) the labels are:\n")
     report.append("$$H(Y) = -\\sum_{c \\in C} p(c) \\log_2 p(c)$$\n")
-    report.append("Where $p(c) = \\frac{|\\{y \\in Y : y = c\\}|}{|Y|}$ is the empirical probability of class $c$.\n")
-    report.append("* **Pure node ($H = 0$)**: All samples belong to a single class (maximum certainty).")
-    report.append("* **Maximum entropy ($H = 1.0$ for binary)**: Classes are evenly split 50/50 (maximum uncertainty).\n")
+    report.append("* H = 0 means all samples are the same class (pure node).")
+    report.append("* H = 1 means classes are split 50/50 (maximum uncertainty).\n")
 
-    report.append("### 1.2 Information Gain (ID3 Splitting Criterion)")
-    report.append("At each tree node, candidate splits divide data into left ($Y_L$) and right ($Y_R$) subsets based on threshold $\\theta$ for feature $X_j$. Information Gain $IG(Y, X_j, \\theta)$ measures the reduction in entropy:\n")
-    report.append("$$H(Y | X_j, \\theta) = \\frac{|Y_L|}{|Y|} H(Y_L) + \\frac{|Y_R|}{|Y|} H(Y_R)$$\n")
-    report.append("$$IG(Y, X_j, \\theta) = H(Y) - H(Y | X_j, \\theta)$$\n")
-    report.append("The optimal split is chosen by solving:")
-    report.append("$$\\arg\\max_{j, \\theta} IG(Y, X_j, \\theta)$$\n")
+    report.append("### 1.2 Information Gain")
+    report.append("At each tree node we try all possible splits and pick the one that reduces entropy the most:\n")
+    report.append("$$IG(Y, X_j, \\theta) = H(Y) - \\left(\\frac{|Y_L|}{|Y|} H(Y_L) + \\frac{|Y_R|}{|Y|} H(Y_R)\\right)$$\n")
 
-    report.append("### 1.3 Random Forest Bagging & Feature Subsampling")
-    report.append("To prevent individual decision trees from overfitting and to decorrelate the ensemble:")
-    report.append("1. **Bootstrap Row Sampling**: For tree $t \\in \\{1, \\dots, N_{\\text{trees}}\\}$, a sample of size $M$ is drawn with replacement from training set $D$. Approximately $(1 - 1/e) \\approx 63.2\\%$ of unique rows are sampled; the remaining $\\approx 36.8\\%$ form the Out-Of-Bag (OOB) validation set.")
-    report.append("2. **Feature Subsampling**: At each tree, a random subset of features $k = \\lfloor 0.70 \\times d \\rfloor$ is selected without replacement ($70\\%$ feature coverage).")
-    report.append("3. **Majority Voting (Inference)**: Given input feature vector $\\mathbf{x}$, each tree $h_t(\\mathbf{x})$ predicts class $\\hat{y}_t$. The forest prediction $\\hat{Y}$ is the majority mode:\n")
-    report.append("$$\\hat{Y}(\\mathbf{x}) = \\arg\\max_{c \\in C} \\sum_{t=1}^{N_{\\text{trees}}} \\mathbb{I}\\left(h_t(\\mathbf{x}) = c\\right)$$\n")
+    report.append("### 1.3 Random Forest Bagging")
+    report.append("To prevent overfitting:")
+    report.append("1. Each tree is trained on a random bootstrap sample of rows (with replacement).")
+    report.append("2. Each tree sees only 70% of features (randomly selected).")
+    report.append("3. Final prediction = majority vote across all trees.\n")
+
+    report.append("### 1.4 Numerical Example of Information Gain")
+    report.append("Parent node with 10 samples: 7 labeled Deck (0), 3 labeled Take Discard (1):\n")
+    report.append("$$H(Parent) = -(0.70 \\log_2 0.70 + 0.30 \\log_2 0.30) = 0.8813 \\text{ bits}$$\n")
+    report.append("Split on feature `dw_gain > 4`:")
+    report.append("* Left branch (dw_gain <= 4, 6 samples all Deck): H(Left) = 0.000 bits")
+    report.append("* Right branch (dw_gain > 4, 4 samples: 1 Deck, 3 Discard): H(Right) = 0.811 bits\n")
+    report.append("$$IG = 0.8813 - [(6/10)*0.000 + (4/10)*0.8113] = 0.5568 \\text{ bits}$$\n")
+    report.append("Since IG > 0, this split is chosen.\n")
 
     report.append("---\n")
 
-    # =========================================================================
-    # SECTION 2: WORKED EXAMPLE — DECISION 1: DRAW (DECK VS DISCARD)
-    # =========================================================================
-    report.append("## 2. Decision 1 Calculation Trace: Draw Decision (Deck vs Discard)\n")
+    # Decision 1: Draw
+    report.append("## 2. Decision 1: Draw (Deck vs Discard)\n")
     sample_hand = ['S4', 'S7', 'D7', 'S8', 'H8', 'S10', 'H4', 'H5', 'H6', 'S13']
     top_disc = 'C7'
     turn_num = 4
@@ -155,105 +143,32 @@ def generate_rf_calculations_report():
         info['highest_unmelded']
     ]
 
-    report.append("### 2.1 Concrete Scenario")
-    report.append(f"* **AI Current Hand (10 cards)**: `{', '.join(sample_hand)}`")
-    report.append(f"* **Top Discard Card**: `{top_disc}` (Rank {top_n}, Suit {top_s})")
-    report.append(f"* **Game State**: Turn {turn_num}, Deck Remaining = {deck_size} cards\n")
+    report.append("### 2.1 Scenario")
+    report.append(f"* Hand (10 cards): `{', '.join(sample_hand)}`")
+    report.append(f"* Top Discard: `{top_disc}` (Rank {top_n}, Suit {top_s})")
+    report.append(f"* Turn {turn_num}, Deck has {deck_size} cards\n")
 
-    report.append("### 2.2 Feature Vector Extraction")
-    report.append("| Feature | Name | Formula / Derivation | Computed Value |")
-    report.append("|---------|------|----------------------|----------------|")
-    report.append(f"| $x_0$ | `turn_num` | Elapsed turn index | `{turn_num}` |")
-    report.append(f"| $x_1$ | `deck_size` | Remaining cards in draw stock | `{deck_size}` |")
-    report.append(f"| $x_2$ | `current_dw` | Sorter.calculate_deadwood(hand) | `{curr_dw}` |")
-    report.append(f"| $x_3$ | `best_dw_with_discard` | $\\min (\\text{{DW}})$ with discard | `{best_dw_with_disc}` |")
-    report.append(f"| $x_4$ | `dw_gain` | $\\max(0, x_2 - x_3)$ (Deadwood reduced) | `{dw_gain}` |")
-    report.append(f"| $x_5$ | `top_num` | Numeric rank of discard card (`C7` $\\rightarrow 7$) | `{top_n}` |")
-    report.append(f"| $x_6$ | `same_num` | Count of cards in hand with rank 7 (`S7`, `D7`) | `{same_num}` |")
-    report.append(f"| $x_7$ | `adj1` | Cards in hand of Clubs with rank $7 \\pm 1$ ($6$ or $8$) | `{adj1}` |")
-    report.append(f"| $x_8$ | `adj2` | Cards in hand of Clubs with rank $7 \\pm 2$ ($5$ or $9$) | `{adj2}` |")
-    report.append(f"| $x_9$ | `num_sets` | Completed 3/4-of-a-kind sets | `{len(info['sets'])}` |")
-    report.append(f"| $x_{{10}}$ | `num_seqs` | Completed 3+ card suit sequences (`H4-H5-H6`) | `{len(info['seqs'])}` |")
-    report.append(f"| $x_{{11}}$ | `num_unmelded` | Cards not part of any meld | `{len(info['unmelded'])}` |")
-    report.append(f"| $x_{{12}}$ | `highest_unmelded` | Max deadwood value among unmelded cards (`S13` $\\rightarrow 10$) | `{info['highest_unmelded']}` |\n")
+    report.append("### 2.2 Feature Vector")
+    report.append("| Feature | Value |")
+    report.append("|---------|-------|")
+    report.append(f"| turn_num | {turn_num} |")
+    report.append(f"| deck_size | {deck_size} |")
+    report.append(f"| current_dw | {curr_dw} |")
+    report.append(f"| best_dw_with_discard | {best_dw_with_disc} |")
+    report.append(f"| dw_gain | {dw_gain} |")
+    report.append(f"| top_num | {top_n} |")
+    report.append(f"| same_num | {same_num} |")
+    report.append(f"| adj1 | {adj1} |")
+    report.append(f"| adj2 | {adj2} |")
+    report.append(f"| num_sets | {len(info['sets'])} |")
+    report.append(f"| num_seqs | {len(info['seqs'])} |")
+    report.append(f"| num_unmelded | {len(info['unmelded'])} |")
+    report.append(f"| highest_unmelded | {info['highest_unmelded']} |\n")
 
-    report.append(f"$$\\mathbf{{x}}_{{\\text{{draw}}}} = [{', '.join(str(v) for v in draw_feat_vals)}]$$\n")
-
-    report.append("### 1.4 Step-by-Step Numerical Example of Information Gain")
-    report.append("Consider a parent node with 10 training samples: 7 labeled `Deck (0)` and 3 labeled `Take Discard (1)`:\n")
-    report.append("1. **Calculate Parent Entropy**:")
-    report.append("   $$p(0) = \\frac{7}{10} = 0.70, \\quad p(1) = \\frac{3}{10} = 0.30$$")
-    report.append("   $$H(\\text{Parent}) = - (0.70 \\log_2 0.70 + 0.30 \\log_2 0.30) = - (0.70 \\times (-0.5146) + 0.30 \\times (-1.7370)) = 0.8813 \\text{ bits}$$\n")
-    report.append("2. **Evaluate Candidate Split** on feature `dw_gain > 4`:")
-    report.append("   * **Left branch** (`dw_gain <= 4`, 6 samples): 6 Class 0, 0 Class 1")
-    report.append("     $$H(\\text{Left}) = - (1.0 \\log_2 1.0) = 0.0000 \\text{ bits (pure)}$$")
-    report.append("   * **Right branch** (`dw_gain > 4`, 4 samples): 1 Class 0, 3 Class 1")
-    report.append("     $$H(\\text{Right}) = - (0.25 \\log_2 0.25 + 0.75 \\log_2 0.75) = 0.8113 \\text{ bits}$$\n")
-    report.append("3. **Calculate Conditional Entropy & Information Gain**:")
-    report.append("   $$H(\\text{Child}) = \\frac{6}{10} \\times 0.0000 + \\frac{4}{10} \\times 0.8113 = 0.3245 \\text{ bits}$$")
-    report.append("   $$IG = H(\\text{Parent}) - H(\\text{Child}) = 0.8813 - 0.3245 = \\mathbf{0.5568 \\text{ bits}}$$\n")
-    report.append("Since $IG = 0.5568 > 0$, this split significantly reduces uncertainty and is selected as a branch node in the decision tree.\n")
-
-    report.append("---\n")
-
-    # =========================================================================
-    # SECTION 2: WORKED EXAMPLE — DECISION 1: DRAW (DECK VS DISCARD)
-    # =========================================================================
-    report.append("## 2. Decision 1 Calculation Trace: Draw Decision (Deck vs Discard)\n")
-    sample_hand = ['S4', 'S7', 'D7', 'S8', 'H8', 'S10', 'H4', 'H5', 'H6', 'S13']
-    top_disc = 'C7'
-    turn_num = 4
-    deck_size = 28
-
-    curr_dw = Sorter.calculate_cards_deadwood(sample_hand)
-    cand_11 = sample_hand + [top_disc]
-    best_dw_with_disc = min(
-        Sorter.calculate_cards_deadwood([c for c in cand_11 if c != disc])
-        for disc in cand_11
-    )
-    dw_gain = max(0, curr_dw - best_dw_with_disc)
-    top_n = int(top_disc[1:])
-    top_s = top_disc[0]
-    same_num = sum(1 for c in sample_hand if int(c[1:]) == top_n)
-    adj1 = sum(1 for c in sample_hand if c[0] == top_s and abs(int(c[1:]) - top_n) == 1)
-    adj2 = sum(1 for c in sample_hand if c[0] == top_s and abs(int(c[1:]) - top_n) == 2)
-    info = Sorter.analyze_hand_melds(sample_hand)
-
-    draw_feat_vals = [
-        turn_num, deck_size, curr_dw, best_dw_with_disc, dw_gain,
-        top_n, same_num, adj1, adj2,
-        len(info['sets']), len(info['seqs']), len(info['unmelded']),
-        info['highest_unmelded']
-    ]
-
-    report.append("### 2.1 Concrete Scenario")
-    report.append(f"* **AI Current Hand (10 cards)**: `{', '.join(sample_hand)}`")
-    report.append(f"* **Top Discard Card**: `{top_disc}` (Rank {top_n}, Suit {top_s})")
-    report.append(f"* **Game State**: Turn {turn_num}, Deck Remaining = {deck_size} cards\n")
-
-    report.append("### 2.2 Feature Vector Extraction")
-    report.append("| Feature | Name | Formula / Derivation | Computed Value |")
-    report.append("|---------|------|----------------------|----------------|")
-    report.append(f"| $x_0$ | `turn_num` | Elapsed turn index | `{turn_num}` |")
-    report.append(f"| $x_1$ | `deck_size` | Remaining cards in draw stock | `{deck_size}` |")
-    report.append(f"| $x_2$ | `current_dw` | Sorter.calculate_deadwood(hand) | `{curr_dw}` |")
-    report.append(f"| $x_3$ | `best_dw_with_discard` | $\\min (\\text{{DW}})$ with discard | `{best_dw_with_disc}` |")
-    report.append(f"| $x_4$ | `dw_gain` | $\\max(0, x_2 - x_3)$ (Deadwood reduced) | `{dw_gain}` |")
-    report.append(f"| $x_5$ | `top_num` | Numeric rank of discard card (`C7` $\\rightarrow 7$) | `{top_n}` |")
-    report.append(f"| $x_6$ | `same_num` | Count of cards in hand with rank 7 (`S7`, `D7`) | `{same_num}` |")
-    report.append(f"| $x_7$ | `adj1` | Cards in hand of Clubs with rank $7 \\pm 1$ ($6$ or $8$) | `{adj1}` |")
-    report.append(f"| $x_8$ | `adj2` | Cards in hand of Clubs with rank $7 \\pm 2$ ($5$ or $9$) | `{adj2}` |")
-    report.append(f"| $x_9$ | `num_sets` | Completed 3/4-of-a-kind sets | `{len(info['sets'])}` |")
-    report.append(f"| $x_{{10}}$ | `num_seqs` | Completed 3+ card suit sequences (`H4-H5-H6`) | `{len(info['seqs'])}` |")
-    report.append(f"| $x_{{11}}$ | `num_unmelded` | Cards not part of any meld | `{len(info['unmelded'])}` |")
-    report.append(f"| $x_{{12}}$ | `highest_unmelded` | Max deadwood value among unmelded cards (`S13` $\\rightarrow 10$) | `{info['highest_unmelded']}` |\n")
-
-    report.append(f"$$\\mathbf{{x}}_{{\\text{{draw}}}} = [{', '.join(str(v) for v in draw_feat_vals)}]$$\n")
-
-    report.append("### 2.3 Ensemble Decision Tree Inference")
+    report.append("### 2.3 Tree Voting Trace")
     rf_draw = engine.draw_model
     x_input = np.array([draw_feat_vals])
-    
+
     votes = []
     tree_trace_blocks = []
     trees = rf_draw._Randomforest__trees
@@ -264,7 +179,7 @@ def generate_rf_calculations_report():
         trace_lines, vote = trace_tree_prediction(tree._tree, x_sub, DRAW_FEATURES, cols)
         votes.append(vote)
         block = [
-            f"**Tree #{t_idx+1} (Subsampled {len(cols)} features: {[DRAW_FEATURES[c] for c in cols[:4]]}...)**",
+            f"**Tree #{t_idx+1} (Features: {[DRAW_FEATURES[c] for c in cols[:4]]}...)**",
             "```text"
         ]
         block.extend(trace_lines)
@@ -282,35 +197,29 @@ def generate_rf_calculations_report():
     vote_discard = votes.count(1)
     majority_vote = 1 if vote_discard > vote_deck else 0
 
-    report.append("\n### 2.4 Final Majority Vote Tally")
-    report.append(f"* **Tree Votes (All 10 Trees)**: `Deck (0)` = {vote_deck} votes | `Take Discard (1)` = {vote_discard} votes")
-    report.append(f"* **Ensemble Formula**: $\\hat{{Y}} = \\arg\\max(V_0={vote_deck}, V_1={vote_discard}) = {majority_vote}$")
-    action_text = "**TAKE DISCARD** (Forms a 3-of-a-kind with `S7` and `D7`!)" if majority_vote == 1 or dw_gain >= 6 else "**DRAW FROM UNKNOWN DECK**"
-    report.append(f"* **Final Executed Action**: {action_text}\n")
+    report.append("\n### 2.4 Vote Tally")
+    report.append(f"* Deck (0): {vote_deck} votes | Take Discard (1): {vote_discard} votes")
+    action_text = "TAKE DISCARD (C7 completes 3-of-a-kind with S7 and D7!)" if majority_vote == 1 or dw_gain >= 6 else "DRAW FROM DECK"
+    report.append(f"* Final Action: **{action_text}**\n")
 
     report.append("---\n")
 
-    # =========================================================================
-    # SECTION 3: WORKED EXAMPLE — DECISION 2: DISCARD
-    # =========================================================================
-    report.append("## 3. Decision 2 Calculation Trace: Discard Selection (11 Cards Candidate Scoring)\n")
-    hand_11 = sample_hand + [top_disc]  # 11 cards
+    # Decision 2: Discard
+    report.append("## 3. Decision 2: Discard Selection (11 Cards)\n")
+    hand_11 = sample_hand + [top_disc]
     base_dw = Sorter.calculate_cards_deadwood(hand_11)
     info_11 = Sorter.analyze_hand_melds(hand_11)
 
-    report.append("### 3.1 Composite Scoring Function")
-    report.append("For each candidate card $c \\in \\text{Hand}_{11}$, the AI computes a combined **Domain Heuristic + Random Forest** score:\n")
-    report.append("$$\\text{Score}(c) = S_{\\text{meld}} + 25 \\times (100 - \\text{DW}_{\\text{after}}) + 4 \\times \\min(\\text{rank}, 10) - (12 \\times \\text{same\\_num} + 8 \\times \\text{adj1}) + 40 \\times \\hat{y}_{\\text{ML}}$$\n")
-    report.append("Where:")
-    report.append("* $S_{\\text{meld}} = -5000$ if $c$ is part of a completed Meld (Run/Set), protecting completed melds from being broken.")
-    report.append("* $25 \\times (100 - \\text{DW}_{\\text{after}})$ rewards leaving the minimal possible deadwood.")
-    report.append("* $4 \\times \\min(\\text{rank}, 10)$ incentivizes shedding high-value deadwood (Kings, Queens, Jacks = 10 pts).")
-    report.append("* $-(12 \\times \\text{same\\_num} + 8 \\times \\text{adj1})$ penalizes discarding pairs or connectors that have high probability of completing future melds.")
-    report.append("* $40 \\times \\hat{y}_{\\text{ML}}$ integrates the Random Forest model classification recommendation.\n")
+    report.append("### 3.1 Scoring Formula")
+    report.append("For each card, we compute a score:\n")
+    report.append("$$Score(c) = S_{meld} + 25*(100 - DW_{after}) + 4*rank - (12*same\\_num + 8*adj1) + 40*ML\\_vote$$\n")
+    report.append("* Meld penalty: -5000 if card is part of a meld (we never break melds)")
+    report.append("* We prefer to leave the hand with low deadwood")
+    report.append("* High-value isolated cards (K, Q, J) are preferred discards\n")
 
-    report.append("### 3.2 Evaluation Table Across All 11 Cards")
-    report.append("| Card | Rank | In Meld? | DW After | DW Reduction | Pairs/Conn | ML Vote | Final Score | Action |")
-    report.append("|------|------|----------|----------|--------------|------------|---------|-------------|--------|")
+    report.append("### 3.2 Scores for All 11 Cards")
+    report.append("| Card | In Meld? | DW After | Score | Action |")
+    report.append("|------|----------|----------|-------|--------|")
 
     rf_disc = engine.discard_model
     best_card = None
@@ -324,16 +233,16 @@ def generate_rf_calculations_report():
         c_suit = c[0]
         c_info = Sorter.analyze_hand_melds(c_10)
 
-        same_num = sum(1 for x in c_10 if int(x[1:]) == c_num)
-        adj1 = sum(1 for x in c_10 if x[0] == c_suit and abs(int(x[1:]) - c_num) == 1)
-        adj2 = sum(1 for x in c_10 if x[0] == c_suit and abs(int(x[1:]) - c_num) == 2)
+        same_num_c = sum(1 for x in c_10 if int(x[1:]) == c_num)
+        adj1_c = sum(1 for x in c_10 if x[0] == c_suit and abs(int(x[1:]) - c_num) == 1)
+        adj2_c = sum(1 for x in c_10 if x[0] == c_suit and abs(int(x[1:]) - c_num) == 2)
         in_set = 1 if c in info_11['sets'] else 0
         in_seq = 1 if c in info_11['seqs'] else 0
         in_meld = in_set or in_seq
 
         feat_disc = np.array([[
             turn_num, base_dw, dw_after, c_num,
-            in_set, in_seq, same_num, adj1, adj2,
+            in_set, in_seq, same_num_c, adj1_c, adj2_c,
             dw_red, c_info['pairs'], c_info['connectors'],
             c_info['outs'], 0, 0
         ]])
@@ -344,7 +253,7 @@ def generate_rf_calculations_report():
             score -= 5000
         score += (100 - dw_after) * 25
         score += min(c_num, 10) * 4
-        score -= (same_num * 12 + adj1 * 8)
+        score -= (same_num_c * 12 + adj1_c * 8)
         score += ml_pred * 40
 
         is_best = False
@@ -354,33 +263,29 @@ def generate_rf_calculations_report():
             is_best = True
 
         meld_str = "YES" if in_meld else "NO"
-        report.append(f"| `{c}` | {c_num} | {meld_str} | {dw_after} | {dw_red} | {same_num}/{adj1} | {ml_pred} | **{score}** | {'★ CHOSEN' if is_best else 'Keep'} |")
+        report.append(f"| `{c}` | {meld_str} | {dw_after} | **{score}** | {'CHOSEN' if is_best else '-'} |")
 
-    report.append(f"\n**Discard Decision Result**: The AI selected **`{best_card}`** (Score = **{best_score}**).")
-    report.append(f"High-deadwood isolated card `{best_card}` (10 deadwood points) is discarded while completely preserving the `H4-H5-H6` sequence and `S7-D7-C7` 3-of-a-kind set!\n")
+    report.append(f"\nResult: AI discards **`{best_card}`** (Score = {best_score}).\n")
 
     report.append("---\n")
 
-    # =========================================================================
-    # SECTION 4: WORKED EXAMPLE — DECISION 3: KNOCK / GIN
-    # =========================================================================
-    report.append("## 4. Decision 3 Calculation Trace: Knock / Gin Decision\n")
+    # Decision 3: Knock
+    report.append("## 4. Decision 3: Knock / Gin Decision\n")
     post_discard_hand = [c for c in hand_11 if c != best_card]
     final_dw = Sorter.calculate_cards_deadwood(post_discard_hand)
     k_info = Sorter.analyze_hand_melds(post_discard_hand)
 
-    report.append("### 4.1 State Analysis After Discard")
-    report.append(f"* **Remaining 10 Cards**: `{', '.join(post_discard_hand)}`")
-    report.append(f"* **Deadwood Total**: **{final_dw}** points")
-    report.append(f"* **Formed Sets**: `{k_info['sets']}`")
-    report.append(f"* **Formed Sequences**: `{k_info['seqs']}`")
-    report.append(f"* **Unmelded Deadwood Cards**: `{k_info['unmelded']}`\n")
+    report.append("### 4.1 State After Discard")
+    report.append(f"* Hand: `{', '.join(post_discard_hand)}`")
+    report.append(f"* Deadwood: {final_dw}")
+    report.append(f"* Sets: `{k_info['sets']}`")
+    report.append(f"* Sequences: `{k_info['seqs']}`")
+    report.append(f"* Unmelded: `{k_info['unmelded']}`\n")
 
-    report.append("### 4.2 Mathematical Evaluation Rules")
-    report.append("1. **Absolute Gin Condition**: If $\\text{Deadwood} = 0$, immediately trigger **GIN** (+25 Bonus points).")
-    report.append("2. **Low Deadwood Safe Knock**: If $1 \\le \\text{Deadwood} \\le 4$, trigger **KNOCK** immediately (undercut probability $< 3\\%$).")
-    report.append("3. **Threshold Boundary ($5 \\le \\text{Deadwood} \\le 10$)**: Evaluated using the Knock Random Forest model:")
-    report.append("   $$\\mathbf{x}_{\\text{knock}} = [\\text{turn}, \\text{deck}, \\text{DW}, |\\text{sets}|, |\\text{seqs}|, |\\text{unmelded}|, \\text{high}, \\text{pairs}, \\text{conn}, \\text{gin\\_chance}]$$\n")
+    report.append("### 4.2 Rules for Knocking")
+    report.append("1. If Deadwood = 0: GIN (always)")
+    report.append("2. If Deadwood <= 4: KNOCK (safe)")
+    report.append("3. If 5 <= Deadwood <= 10: Ask the Random Forest model\n")
 
     k_feats = np.array([[
         turn_num, deck_size, final_dw,
@@ -389,31 +294,24 @@ def generate_rf_calculations_report():
         k_info['gin_chance']
     ]])
     k_pred = engine.knock_model.predict(k_feats)[0] if engine.knock_trained else 1
-    
-    k_label_map = {0: "CONTINUE (Draw next turn)", 1: "KNOCK (End round)", 2: "GIN (Optimal hand)"}
-    report.append(f"* **Feature Vector**: `{k_feats[0].tolist()}`")
-    report.append(f"* **Random Forest Prediction**: Class `{k_pred}` $\\rightarrow$ **{k_label_map.get(k_pred, 'KNOCK')}**")
+
+    k_label_map = {0: "CONTINUE", 1: "KNOCK", 2: "GIN"}
+    report.append(f"* Random Forest Prediction: Class {k_pred} -> **{k_label_map.get(k_pred, 'KNOCK')}**")
 
     if final_dw == 0:
-        decision_str = "GIN! (0 Deadwood)"
+        decision_str = "GIN!"
     elif final_dw <= 10 and k_pred in [1, 2]:
-        decision_str = f"KNOCK! (Deadwood = {final_dw} <= 10)"
+        decision_str = f"KNOCK! (Deadwood = {final_dw})"
     else:
-        decision_str = "CONTINUE (Keep playing to reduce deadwood further)"
+        decision_str = "CONTINUE"
 
-    report.append(f"* **Final Strategic Decision**: **{decision_str}**\n")
-
-    report.append("---\n")
-    report.append("## 5. Verification Checklist for Instructors")
-    report.append("1. **Are model files intact?** Yes — `model/RandomForest.py` and `model/IB3.py` are completely unchanged.")
-    report.append("2. **Are calculations reproducible?** Yes — execute `python show_rf_calculations.py` in the workspace terminal to reproduce this trace dynamically on any hand.")
-    report.append("3. **Are baselines compared?** Yes — documented in `evaluation_results/report.md` with full confusion matrices and win-rate simulations.")
+    report.append(f"* Final Decision: **{decision_str}**\n")
 
     output_path = os.path.join(RESULTS_DIR, "random_forest_calculations.md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report))
 
-    print(f"Calculations document successfully generated at: {output_path}")
+    print(f"Report saved to: {output_path}")
     return output_path
 
 
