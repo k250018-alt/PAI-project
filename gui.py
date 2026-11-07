@@ -17,9 +17,9 @@ except Exception:
 
 WIDTH, HEIGHT = 1300, 720
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Gin Rummy Desktop AI")
+pygame.display.set_caption("Gin Rummy AI")
 
-# Classic Solitaire green-felt palette
+# colors for the green table
 BG_DARK = (0, 100, 0)
 BG_LIGHT = (34, 139, 34)
 BG_FELT = (15, 120, 15)
@@ -42,16 +42,14 @@ CARD_THEMES = [
     ("Traditional", os.path.join(BASE_DIR, "CuteCards - asset pack 0.1update", "CuteCards - asset pack", "updated-card-2026.png")),
 ]
 
-
+# cache for background so we don't redraw every frame
 _FELT_CACHE = {}
 
 def draw_felt_background(surface, width, height):
-    """Draws a subtle solitaire-style green felt background with diamond texture (cached)."""
     cache_key = (width, height)
     if cache_key not in _FELT_CACHE:
         bg = pygame.Surface((width, height))
         bg.fill(BG_DARK)
-        # Subtle diamond felt pattern
         pattern_color = (10, 110, 10)
         spacing = 28
         for y in range(-spacing, height + spacing, spacing):
@@ -60,7 +58,7 @@ def draw_felt_background(surface, width, height):
                 cx, cy = x + offset, y
                 pts = [(cx, cy - 4), (cx + 4, cy), (cx, cy + 4), (cx - 4, cy)]
                 pygame.draw.polygon(bg, pattern_color, pts)
-        # Soft vignette: darker edges
+        # darker edges effect
         for edge_w in range(60):
             alpha = int(40 * (1 - edge_w / 60))
             edge_surf = pygame.Surface((width, height), pygame.SRCALPHA)
@@ -71,7 +69,6 @@ def draw_felt_background(surface, width, height):
 
 
 class SoundManager:
-    """Manages audio effects for draws, discards, knocks, gins, clicks, and background music."""
     def __init__(self):
         self.sounds = {}
         sound_files = {
@@ -89,14 +86,14 @@ class SoundManager:
                 except Exception:
                     pass
 
-        # Background music
+        # background music
         bgm_path = os.path.join(BASE_DIR, "assets", "sounds", "bgm_chill_lofi.wav")
         self.bgm_playing = False
         if os.path.exists(bgm_path):
             try:
                 pygame.mixer.music.load(bgm_path)
-                pygame.mixer.music.set_volume(0.3)  # 30% volume so it doesn't overpower SFX
-                pygame.mixer.music.play(-1)  # Loop forever
+                pygame.mixer.music.set_volume(0.3)
+                pygame.mixer.music.play(-1)
                 self.bgm_playing = True
             except Exception:
                 pass
@@ -110,7 +107,6 @@ class SoundManager:
                 pass
 
     def toggle_music(self):
-        """Toggle background music on/off."""
         if self.bgm_playing:
             pygame.mixer.music.pause()
             self.bgm_playing = False
@@ -120,7 +116,7 @@ class SoundManager:
 
 
 class CardAnimation:
-    """Smooth ease-out cubic flying card animation."""
+    # animates a card flying from one place to another
     def __init__(self, card_code, start_pos, end_pos, duration_ms=220, is_face_up=True):
         self.card_code = card_code
         self.start_pos = start_pos
@@ -142,7 +138,7 @@ class CardAnimation:
 
 
 class ScreenShake:
-    """Screen vibration/shake effect on Knock or Gin."""
+    # shakes the screen when someone knocks or gets gin
     def __init__(self):
         self.duration_ms = 0
         self.intensity = 0
@@ -173,26 +169,25 @@ class SpriteSheetLoader:
         if os.path.exists(path):
             sheet = pygame.image.load(path).convert_alpha()
             if is_traditional:
-                # Traditional sheet: rows = H, S, D, C; cols 2-14 = A-K; cols 0-1 = joker/back
+                # Traditional sheet layout: rows = H, S, D, C
                 sheet_w, sheet_h = sheet.get_size()
-                card_w = sheet_w // 15   # 15 columns total
-                card_h = sheet_h // 6    # 6 rows (4 standard + 2 extra color variants)
+                card_w = sheet_w // 15
+                card_h = sheet_h // 6
                 suit_map = {0: 'H', 1: 'S', 2: 'D', 3: 'C'}
                 for row, suit in suit_map.items():
-                    for col_idx in range(13):  # A through K
+                    for col_idx in range(13):
                         key = f"{suit}{col_idx+1}"
-                        src_col = col_idx + 2  # Skip joker + back columns
+                        src_col = col_idx + 2
                         rect = pygame.Rect(src_col * card_w, row * card_h, card_w, card_h)
                         surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
                         surf.blit(sheet, (0, 0), rect)
                         self.sprites[key] = pygame.transform.smoothscale(surf, (75, 108))
-                # Card back is at column 1, row 1 (Spades row)
                 back_rect = pygame.Rect(1 * card_w, 1 * card_h, card_w, card_h)
                 back_surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
                 back_surf.blit(sheet, (0, 0), back_rect)
                 self.card_back = pygame.transform.smoothscale(back_surf, (75, 108))
             else:
-                # CuteCards format: rows = C, D, S, H; cols 0-12 = A-K
+                # CuteCards layout: rows = C, D, S, H
                 suit_map = {0: 'C', 1: 'D', 2: 'S', 3: 'H'}
                 card_w, card_h = 100, 144
                 for row, suit in suit_map.items():
@@ -216,14 +211,14 @@ class SpriteSheetLoader:
 
 def draw_button(surface, text, rect, base_color, mouse_pos):
     hover = rect.collidepoint(mouse_pos)
-    color = (min(base_color[0]+25, 255), min(base_color[1]+25, 255), min(base_color[2]+25, 255)) if hover else base_color
-    # Soft shadow
+    if hover:
+        color = (min(base_color[0]+25, 255), min(base_color[1]+25, 255), min(base_color[2]+25, 255))
+    else:
+        color = base_color
     shadow_rect = rect.move(2, 2)
-    pygame.draw.rect(surface, (0, 0, 0, 60) if hover else (0, 40, 0), shadow_rect, border_radius=10)
+    pygame.draw.rect(surface, (0, 40, 0), shadow_rect, border_radius=10)
     pygame.draw.rect(surface, color, rect, border_radius=10)
     pygame.draw.rect(surface, GOLD, rect, 2, border_radius=10)
-    
-    # Auto-fit text so it never exceeds button boundaries
     txt_surf = FONT_MED.render(text, True, WHITE)
     max_w = rect.width - 16
     if txt_surf.get_width() > max_w:
@@ -232,12 +227,10 @@ def draw_button(surface, text, rect, base_color, mouse_pos):
         target_w = max_w
         target_h = max(1, int(txt_surf.get_height() * (target_w / txt_surf.get_width())))
         txt_surf = pygame.transform.smoothscale(txt_surf, (target_w, target_h))
-        
     surface.blit(txt_surf, (rect.centerx - txt_surf.get_width() // 2, rect.centery - txt_surf.get_height() // 2))
 
 
 def show_rules_dialog():
-    """Displays rules dialog box."""
     dialog_open = True
     while dialog_open:
         for event in pygame.event.get():
@@ -255,9 +248,9 @@ def show_rules_dialog():
             "2. Draw a card each turn from Deck or Discard, then Discard one card.",
             "3. Knocking: Knock when Deadwood points are 10 or lower.",
             "4. Scoring System:",
-            "   • Normal Knock: Difference in Deadwood (Knocker wins).",
-            "   • Gin (0 Deadwood): Opponent Deadwood + 25 Bonus points.",
-            "   • Undercut: Opponent has <= Deadwood. Opponent gains difference + 25 Bonus.",
+            "   * Normal Knock: Difference in Deadwood (Knocker wins).",
+            "   * Gin (0 Deadwood): Opponent Deadwood + 25 Bonus points.",
+            "   * Undercut: Opponent has <= Deadwood. Opponent gains difference + 25 Bonus.",
             "5. First to 100 points wins the match!",
             "",
             "[ Click or Press Any Key to Return to Menu ]"
@@ -273,10 +266,9 @@ def show_rules_dialog():
 
 
 def show_game_over_dialog(user_score: int, ai_score: int):
-    """Displays the game over screen with match results."""
     dialog_open = True
     user_won = user_score >= 100
-    
+
     while dialog_open:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -288,13 +280,13 @@ def show_game_over_dialog(user_score: int, ai_score: int):
         draw_felt_background(SCREEN, WIDTH, HEIGHT)
         overlay = pygame.Rect(180, 120, WIDTH - 360, HEIGHT - 240)
         pygame.draw.rect(SCREEN, SLOT_BG, overlay, border_radius=16)
-        
+
         border_color = GOLD if user_won else BTN_RED
         pygame.draw.rect(SCREEN, border_color, overlay, 3, border_radius=16)
 
         header_txt = "VICTORY!" if user_won else "DEFEAT!"
         header_color = GOLD if user_won else BTN_RED
-        
+
         t_header = FONT_TITLE.render(header_txt, True, header_color)
         t_sub = FONT_LARGE.render("FINAL MATCH RESULTS", True, WHITE)
         t_user = FONT_LARGE.render(f"YOUR SCORE: {user_score}", True, GOLD)
@@ -333,14 +325,12 @@ class GinRummyGUI:
         self.sounds.play("click")
 
     def main_menu(self):
-        """Main menu screen."""
         clock = pygame.time.Clock()
         in_menu = True
 
         while in_menu:
             m_pos = pygame.mouse.get_pos()
             draw_felt_background(SCREEN, WIDTH, HEIGHT)
-            # Central lighter felt circle
             circle_surf = pygame.Surface((760, 760), pygame.SRCALPHA)
             pygame.draw.circle(circle_surf, (20, 130, 20, 40), (380, 380), 380)
             SCREEN.blit(circle_surf, (WIDTH // 2 - 380, HEIGHT // 2 - 380))
@@ -385,27 +375,25 @@ class GinRummyGUI:
             clock.tick(30)
 
     def run_game_loop(self):
-        """Active gameplay session UI loop with drag-and-drop, animations, sound effects, and screen shake."""
         clock = pygame.time.Clock()
         running = True
         game_surf = pygame.Surface((WIDTH, HEIGHT))
 
-        # Drag state
+        # drag and drop state variables
         dragging = False
         drag_card_code = None
-        drag_source = None    # "hand", "deck", "discard"
-        drag_origin = (0, 0)  # Original position for snap-back
-        drag_offset = (0, 0)  # Mouse offset from card top-left
+        drag_source = None    # "hand", "deck", or "discard"
+        drag_origin = (0, 0)
+        drag_offset = (0, 0)
         drag_is_face_up = True
 
-        # Hand area zone for drop detection (where player's cards are)
         HAND_ZONE_Y = HEIGHT - 220
 
         while running:
             m_pos = pygame.mouse.get_pos()
             draw_felt_background(game_surf, WIDTH, HEIGHT)
 
-            # Deadwood & Knock Calculation
+            # calculate deadwood
             cards = self.game.user_hand.sort_cards_by_mode(self.game.user_sort_mode)
             if len(cards) == 11 and self.game.current_phase == "DISCARD":
                 best_disc, user_dw = self.game.user_hand.get_best_knock_discard()
@@ -413,7 +401,7 @@ class GinRummyGUI:
                 user_dw = self.game.user_hand.calculate_deadwood()
                 best_disc = None
 
-            # Buttons
+            # buttons
             btn_surrender = pygame.Rect(30, HEIGHT - 70, 140, 45)
             btn_theme = pygame.Rect(WIDTH - 390, 15, 215, 36)
             btn_sort = pygame.Rect(WIDTH - 160, 15, 130, 36)
@@ -427,26 +415,24 @@ class GinRummyGUI:
             draw_button(game_surf, f"SORT: {self.game.user_sort_mode}", btn_sort, BTN_DARK, m_pos)
             draw_button(game_surf, music_icon, btn_music_game, (60, 60, 70), m_pos)
 
-            # Show dynamic GIN! or KNOCK Button
-            can_knock = (self.game.current_turn == "USER" and 
-                         self.game.current_phase == "DISCARD" and 
-                         user_dw <= 10 and 
+            # show knock/gin button only when player can knock
+            can_knock = (self.game.current_turn == "USER" and
+                         self.game.current_phase == "DISCARD" and
+                         user_dw <= 10 and
                          not self.game.round_over)
             if can_knock:
                 btn_label = "GIN!" if user_dw == 0 else "KNOCK"
                 btn_color = (200, 160, 20) if user_dw == 0 else BTN_GREEN
                 draw_button(game_surf, btn_label, btn_knock, btn_color, m_pos)
 
-            # Show NEXT ROUND button when round finishes
             if self.game.round_over:
                 draw_button(game_surf, "NEXT ROUND", btn_next, BTN_GREEN, m_pos)
 
-            # Table Slots
+            # draw deck and discard pile slots
             deck_rect = pygame.Rect(WIDTH // 2 - 90, HEIGHT // 2 - 54, 75, 108)
             disc_rect = pygame.Rect(WIDTH // 2 + 15, HEIGHT // 2 - 54, 75, 108)
             pygame.draw.rect(game_surf, SLOT_BG, deck_rect, border_radius=8)
             pygame.draw.rect(game_surf, SLOT_BG, disc_rect, border_radius=8)
-            # Slot labels
             deck_label = FONT_SMALL.render("DECK", True, (100, 180, 100))
             disc_label = FONT_SMALL.render("DISCARD", True, (100, 180, 100))
             game_surf.blit(deck_label, (deck_rect.centerx - deck_label.get_width() // 2, deck_rect.bottom + 4))
@@ -459,7 +445,7 @@ class GinRummyGUI:
             if top_disc and not (dragging and drag_source == "discard"):
                 game_surf.blit(self.current_loader.get_card(top_disc), disc_rect.topleft)
 
-            # AI Hand (Exposed face-up when round is over)
+            # AI hand - shown face down unless round is over
             ai_cards = self.game.ai_hand.get_cards()
             total_ai_w = (len(ai_cards) - 1) * 38 + 75 if ai_cards else 75
             start_x_ai = (WIDTH - total_ai_w) // 2
@@ -467,7 +453,7 @@ class GinRummyGUI:
                 card_img = self.current_loader.get_card(code) if self.game.round_over else self.current_loader.card_back
                 game_surf.blit(card_img, (start_x_ai + i * 38, 35))
 
-            # Player Hand (skip the card being dragged)
+            # player hand
             card_rects = []
             total_player_w = (len(cards) - 1) * 52 + 75 if cards else 75
             start_x = (WIDTH - total_player_w) // 2
@@ -477,21 +463,18 @@ class GinRummyGUI:
                     game_surf.blit(self.current_loader.get_card(code), rect.topleft)
                 card_rects.append((rect, code))
 
-            # Drop zone highlight when dragging
+            # highlight drop zones while dragging
             if dragging:
                 if drag_source == "hand" and self.game.current_phase == "DISCARD":
-                    # Highlight discard pile as drop target
                     highlight = pygame.Surface((75 + 10, 108 + 10), pygame.SRCALPHA)
                     glow_color = (255, 215, 0, 60) if disc_rect.inflate(30, 30).collidepoint(m_pos) else (255, 255, 255, 30)
                     highlight.fill(glow_color)
                     game_surf.blit(highlight, (disc_rect.x - 5, disc_rect.y - 5))
                 elif drag_source in ("deck", "discard") and self.game.current_phase == "DRAW":
-                    # Highlight hand zone as drop target
                     hand_highlight = pygame.Surface((WIDTH, 200), pygame.SRCALPHA)
                     glow_color = (255, 215, 0, 30) if m_pos[1] > HAND_ZONE_Y else (255, 255, 255, 15)
                     hand_highlight.fill(glow_color)
                     game_surf.blit(hand_highlight, (0, HEIGHT - 200))
-                    # Visual feedback when hovering card back over its source slot to place it back
                     if drag_source == "deck" and deck_rect.inflate(20, 20).collidepoint(m_pos):
                         return_glow = pygame.Surface((75 + 10, 108 + 10), pygame.SRCALPHA)
                         return_glow.fill((255, 215, 0, 80))
@@ -501,11 +484,10 @@ class GinRummyGUI:
                         return_glow.fill((255, 215, 0, 80))
                         game_surf.blit(return_glow, (disc_rect.x - 5, disc_rect.y - 5))
 
-            # Render Active Flying Animations
+            # draw flying card animations
             for anim in self.active_animations[:]:
                 anim_pos = anim.get_pos()
                 card_img = self.current_loader.get_card(anim.card_code) if anim.is_face_up else self.current_loader.card_back
-                # Subtle drop shadow for flying card
                 shadow = pygame.Surface((75, 108), pygame.SRCALPHA)
                 shadow.fill((0, 0, 0, 80))
                 game_surf.blit(shadow, (anim_pos[0] + 5, anim_pos[1] + 5))
@@ -513,26 +495,24 @@ class GinRummyGUI:
                 if anim.finished:
                     self.active_animations.remove(anim)
 
-            # Render Dragged Card (on top of everything)
+            # draw card being dragged on top of everything
             if dragging:
                 drag_x = m_pos[0] - drag_offset[0]
                 drag_y = m_pos[1] - drag_offset[1]
                 card_img = self.current_loader.get_card(drag_card_code) if (drag_is_face_up and drag_card_code) else self.current_loader.card_back
-                # Drop shadow under dragged card
                 shadow = pygame.Surface((75, 108), pygame.SRCALPHA)
                 shadow.fill((0, 0, 0, 90))
                 game_surf.blit(shadow, (drag_x + 6, drag_y + 6))
                 game_surf.blit(card_img, (drag_x, drag_y))
 
-            # HUD Display
+            # HUD - scores and info at top
             hud = FONT_MED.render(
-                f"YOU: {self.game.user_score} PTS | AI: {self.game.ai_score} PTS | Deck: {self.game.deck_remaining} | AI Acc: {self.game.ai_engine.accuracy:.1f}%", 
+                f"YOU: {self.game.user_score} PTS | AI: {self.game.ai_score} PTS | Deck: {self.game.deck_remaining} | AI Acc: {self.game.ai_engine.accuracy:.1f}%",
                 True, GOLD
             )
             dw_msg = f"Your Deadwood: {user_dw}" + (f" (discarding {best_disc})" if best_disc and can_knock else "")
             dw_txt = FONT_SMALL.render(dw_msg, True, WHITE)
 
-            # Drag hint message
             if self.game.current_turn == "USER" and not self.game.round_over and not dragging:
                 if self.game.current_phase == "DRAW":
                     hint = "Drag a card from Deck or Discard pile to your hand"
@@ -548,30 +528,29 @@ class GinRummyGUI:
             game_surf.blit(dw_txt, (30, 42))
             game_surf.blit(msg, (WIDTH // 2 - msg.get_width() // 2, HEIGHT - 220))
 
-            # Gin Celebration Overlay Banner
+            # gin celebration banner
             if pygame.time.get_ticks() < self.gin_celebration_ticks:
                 gin_banner = pygame.Rect(WIDTH // 2 - 250, HEIGHT // 2 - 50, 500, 100)
                 pygame.draw.rect(game_surf, (20, 20, 25, 230), gin_banner, border_radius=16)
                 pygame.draw.rect(game_surf, GOLD, gin_banner, 4, border_radius=16)
-                t_gin = FONT_TITLE.render("★ GIN! +25 BONUS ★", True, GOLD)
+                t_gin = FONT_TITLE.render("* GIN! +25 BONUS *", True, GOLD)
                 game_surf.blit(t_gin, (WIDTH // 2 - t_gin.get_width() // 2, HEIGHT // 2 - 25))
 
-            # Screen Shake Blit
+            # apply screen shake
             offset_x, offset_y = self.shake.get_offset()
             SCREEN.fill((0, 0, 0))
             SCREEN.blit(game_surf, (offset_x, offset_y))
             pygame.display.flip()
 
-            # Check 100+ points match end trigger
+            # check if someone reached 100 points
             if self.game.round_over and (self.game.user_score >= 100 or self.game.ai_score >= 100):
                 pygame.time.delay(1000)
                 show_game_over_dialog(self.game.user_score, self.game.ai_score)
                 return
 
-            # Execute AI Turn via play.py
+            # AI takes its turn
             if self.game.current_turn == "AI" and not self.game.round_over:
                 pygame.time.delay(500)
-                # Capture state before turn
                 ai_cards = self.game.ai_hand.get_cards()
                 top_disc_before = self.game.discard_pile.top()
                 take_disc = self.game.ai_engine.predict_draw(self.game.turn_number, self.game.deck_remaining, ai_cards, top_disc_before)
@@ -580,16 +559,13 @@ class GinRummyGUI:
                 self.sounds.play("draw")
                 self.active_animations.append(CardAnimation(None, start_pt, (WIDTH // 2, 35), 200, is_face_up=False))
 
-                # Execute AI
                 self.game.execute_ai_turn()
 
-                # Discard animation for AI
                 new_top_disc = self.game.discard_pile.top()
                 if new_top_disc:
                     self.sounds.play("discard")
                     self.active_animations.append(CardAnimation(new_top_disc, (WIDTH // 2, 35), disc_rect.topleft, 200, is_face_up=True))
 
-                # Check if AI Knocked or Ginned
                 if self.game.round_over:
                     ai_dw = self.game.ai_hand.calculate_deadwood()
                     if ai_dw == 0:
@@ -600,14 +576,13 @@ class GinRummyGUI:
                         self.sounds.play("knock")
                         self.shake.start(duration_ms=450, intensity=12)
 
-            # Input Events (Drag-and-Drop)
+            # handle mouse events for drag and drop
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     click_pos = event.pos
-                    # Button clicks (non-drag)
                     if btn_sort.collidepoint(click_pos):
                         self.sounds.play("click")
                         self.game.cycle_sort_mode()
@@ -632,8 +607,8 @@ class GinRummyGUI:
                             self.shake.start(duration_ms=450, intensity=12)
                         self.game.handle_user_knock(best_disc)
 
-                    # Start drag from player hand (DISCARD phase)
-                    elif (self.game.current_turn == "USER" and not self.game.round_over 
+                    # drag from player hand during discard phase
+                    elif (self.game.current_turn == "USER" and not self.game.round_over
                           and self.game.current_phase == "DISCARD"):
                         for rect, code in reversed(card_rects):
                             if rect.collidepoint(click_pos):
@@ -645,12 +620,12 @@ class GinRummyGUI:
                                 drag_is_face_up = True
                                 break
 
-                    # Start drag from deck or discard pile (DRAW phase)
-                    elif (self.game.current_turn == "USER" and not self.game.round_over 
+                    # drag from deck or discard during draw phase
+                    elif (self.game.current_turn == "USER" and not self.game.round_over
                           and self.game.current_phase == "DRAW"):
                         if deck_rect.collidepoint(click_pos) and self.game.deck_remaining > 0:
                             dragging = True
-                            drag_card_code = None  # Face-down, unknown
+                            drag_card_code = None
                             drag_source = "deck"
                             drag_origin = deck_rect.topleft
                             drag_offset = (click_pos[0] - deck_rect.x, click_pos[1] - deck_rect.y)
@@ -668,24 +643,21 @@ class GinRummyGUI:
                         drop_x = event.pos[0] - drag_offset[0]
                         drop_y = event.pos[1] - drag_offset[1]
 
-                        # Check if dropped in valid zone
                         if drag_source == "hand" and self.game.current_phase == "DISCARD":
-                            # Drop on discard pile?
                             drop_zone = disc_rect.inflate(40, 40)
                             if drop_zone.collidepoint(event.pos):
                                 self.sounds.play("discard")
                                 self.active_animations.append(
-                                    CardAnimation(drag_card_code, (drop_x, drop_y), 
+                                    CardAnimation(drag_card_code, (drop_x, drop_y),
                                                   disc_rect.topleft, 120, is_face_up=True))
                                 self.game.handle_user_discard(drag_card_code)
                             else:
-                                # Snap back into player hand position
+                                # snap card back to hand
                                 self.active_animations.append(
                                     CardAnimation(drag_card_code, (drop_x, drop_y),
                                                   drag_origin, 120, is_face_up=True))
 
                         elif drag_source == "deck" and self.game.current_phase == "DRAW":
-                            # Only complete draw if dropped down into player's hand zone!
                             if event.pos[1] > HAND_ZONE_Y:
                                 self.sounds.play("draw")
                                 dest_x = start_x + len(cards) * 52
@@ -694,14 +666,12 @@ class GinRummyGUI:
                                                   (dest_x, HEIGHT - 180), 150, is_face_up=False))
                                 self.game.handle_user_draw_deck()
                             else:
-                                # Hovered back over deck or let go outside hand -> Place card back onto deck!
                                 self.sounds.play("click")
                                 self.active_animations.append(
                                     CardAnimation(None, (drop_x, drop_y),
                                                   deck_rect.topleft, 120, is_face_up=False))
 
                         elif drag_source == "discard" and self.game.current_phase == "DRAW":
-                            # Only complete draw if dropped down into player's hand zone!
                             if event.pos[1] > HAND_ZONE_Y:
                                 self.sounds.play("draw")
                                 dest_x = start_x + len(cards) * 52
@@ -710,13 +680,11 @@ class GinRummyGUI:
                                                   (dest_x, HEIGHT - 180), 150, is_face_up=True))
                                 self.game.handle_user_draw_discard()
                             else:
-                                # Hovered back over discard or let go outside hand -> Place card back onto discard pile!
                                 self.sounds.play("click")
                                 self.active_animations.append(
                                     CardAnimation(drag_card_code, (drop_x, drop_y),
                                                   disc_rect.topleft, 120, is_face_up=True))
 
-                        # Reset drag state
                         dragging = False
                         drag_card_code = None
                         drag_source = None
@@ -728,4 +696,3 @@ class GinRummyGUI:
         while True:
             self.main_menu()
             self.run_game_loop()
-

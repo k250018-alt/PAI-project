@@ -1,7 +1,5 @@
-"""
-Dataset generator for Gin Rummy decision models.
-Generates labelled training data for draw, discard, and knock decisions.
-"""
+# Dataset generator for Gin Rummy AI
+# This file generates training data for the draw, discard, and knock decision models
 
 import os
 import sys
@@ -9,7 +7,6 @@ import random
 import csv
 import numpy as np
 
-# Add paths for local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "gin rummy"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "model"))
 
@@ -20,49 +17,40 @@ DATASET_DIR = os.path.join(os.path.dirname(__file__), "dataset")
 
 ALL_CARDS = [f"{s}{n}" for s in "CDSH" for n in range(1, 14)]
 
-# Monte Carlo sampling sizes
-MC_DRAW_SAMPLES = 25     # Deck cards sampled for draw decision
-MC_DISCARD_SAMPLES = 15  # Unseen cards sampled for discard label
-MC_KNOCK_OPPONENTS = 20  # Opponent hands sampled for knock decision
+# how many samples to use for Monte Carlo estimation
+MC_DRAW_SAMPLES = 25
+MC_DISCARD_SAMPLES = 15
+MC_KNOCK_OPPONENTS = 20
 
 
 def card_value(card: str) -> int:
-    """Point value of a card for deadwood calculation."""
     return min(int(card[1:]), 10)
 
 
 def deal_hand(deck: list, n: int = 10) -> list:
-    """Deal n cards from deck (removes them)."""
     hand = deck[:n]
     del deck[:n]
     return hand
 
 
 def analyze_hand(cards: list) -> dict:
-    """Full structural analysis of a hand using the Sorter from play.py."""
     return Sorter.analyze_hand_melds(cards)
 
 
 def simulate_mid_game_hand(rng: random.Random):
-    """
-    Simulates a realistic mid-game state:
-    1. Shuffle and deal two 10-card hands
-    2. Play a random number of turns (2-12) with a greedy bot
-    3. Return the resulting hand, discard pile, and remaining deck
-    """
+    # simulates a mid-game state by playing a few turns with simple greedy logic
     deck = ALL_CARDS.copy()
     rng.shuffle(deck)
 
     hand = deal_hand(deck, 10)
     opp_hand = deal_hand(deck, 10)
-    discard_pile = [deck.pop()]  # Initial upcard
+    discard_pile = [deck.pop()]
 
     turns_played = rng.randint(2, 12)
     for turn in range(turns_played):
-        # Current player alternates
         current = hand if turn % 2 == 0 else opp_hand
 
-        # Greedy draw: take discard if it reduces deadwood
+        # greedy draw: take discard if it helps
         dw_before = Sorter.calculate_cards_deadwood(current)
         if discard_pile:
             top = discard_pile[-1]
@@ -84,7 +72,7 @@ def simulate_mid_game_hand(rng: random.Random):
             else:
                 break
 
-        # Greedy discard: remove card that leaves lowest deadwood
+        # greedy discard: remove card that leaves lowest deadwood
         if len(current) > 10:
             best_disc = min(current,
                             key=lambda c: Sorter.calculate_cards_deadwood([x for x in current if x != c]))
@@ -96,7 +84,6 @@ def simulate_mid_game_hand(rng: random.Random):
 
 
 def compute_draw_features(hand: list, top_discard: str, turn_number: int, deck_size: int) -> dict:
-    """Compute the 13 features for the draw decision model."""
     info = analyze_hand(hand)
     dw_now = info['deadwood']
 
@@ -106,7 +93,6 @@ def compute_draw_features(hand: list, top_discard: str, turn_number: int, deck_s
     adj1 = sum(1 for c in hand if c[0] == top_suit and abs(int(c[1:]) - top_num) == 1)
     adj2 = sum(1 for c in hand if c[0] == top_suit and abs(int(c[1:]) - top_num) == 2)
 
-    # Deadwood gain if taking the discard
     candidate = hand + [top_discard]
     best_dw = min(Sorter.calculate_cards_deadwood([c for c in candidate if c != d]) for d in candidate)
     dw_gain = max(0, dw_now - best_dw)
@@ -129,10 +115,7 @@ def compute_draw_features(hand: list, top_discard: str, turn_number: int, deck_s
 
 
 def label_draw_decision(hand: list, top_discard: str, deck: list, rng: random.Random) -> int:
-    """
-    Monte Carlo label: 1 if taking discard gives deadwood at least as good
-    as the average over MC_DRAW_SAMPLES sampled possible deck draws.
-    """
+    # label is 1 if taking the discard is better than the average deck draw
     candidate = hand + [top_discard]
     dw_with_discard = min(
         Sorter.calculate_cards_deadwood([c for c in candidate if c != d])
@@ -155,7 +138,6 @@ def label_draw_decision(hand: list, top_discard: str, deck: list, rng: random.Ra
 
 
 def compute_discard_features(hand_11: list, card: str, turn_number: int) -> dict:
-    """Compute the 15 features for a single card's discard candidacy."""
     info_11 = analyze_hand(hand_11)
     base_dw = info_11['deadwood']
 
@@ -190,10 +172,7 @@ def compute_discard_features(hand_11: list, card: str, turn_number: int) -> dict
 
 
 def label_discard_decision(hand_11: list, rng: random.Random) -> str:
-    """
-    Monte Carlo label: best card to discard is the one with the lowest expected
-    deadwood after the next draw (MC_DISCARD_SAMPLES sampled unseen cards).
-    """
+    # find the best card to discard using Monte Carlo sampling
     unseen = [c for c in ALL_CARDS if c not in hand_11]
     samples = rng.sample(unseen, min(MC_DISCARD_SAMPLES, len(unseen))) if unseen else []
 
@@ -223,7 +202,6 @@ def label_discard_decision(hand_11: list, rng: random.Random) -> str:
 
 
 def compute_knock_features(hand: list, turn_number: int, deck_size: int) -> dict:
-    """Compute the 10 features for the knock/gin decision model."""
     info = analyze_hand(hand)
     return {
         'turn_number': turn_number,
@@ -240,17 +218,14 @@ def compute_knock_features(hand: list, turn_number: int, deck_size: int) -> dict
 
 
 def label_knock_decision(hand: list, deck: list, turn_number: int, deck_size: int, rng: random.Random) -> tuple:
-    """
-    Label: 0=keep_playing, 1=knock, 2=gin
-    Also returns auxiliary win probabilities for transparency.
-    """
+    # returns 0 = keep playing, 1 = knock, 2 = gin
     dw = Sorter.calculate_cards_deadwood(hand)
 
     if dw == 0:
-        return 2, 1.0, 0.0  # Gin
+        return 2, 1.0, 0.0
 
     if dw > 10:
-        return 0, 0.0, 0.5  # Cannot knock
+        return 0, 0.0, 0.5
 
     unseen = [c for c in ALL_CARDS if c not in hand]
     knock_wins = 0
@@ -283,12 +258,11 @@ def label_knock_decision(hand: list, deck: list, turn_number: int, deck_size: in
 
 
 def generate_datasets(n_draw=10000, n_discard=3000, n_knock=3000):
-    """Generate all three datasets and save as CSV."""
     os.makedirs(DATASET_DIR, exist_ok=True)
     rng = random.Random(SEED)
     np.random.seed(SEED)
 
-    # ========== 1. DRAW DATASET ==========
+    # generate draw dataset
     print(f"Generating draw dataset ({n_draw} samples)...")
     draw_rows = []
     for i in range(n_draw):
@@ -310,7 +284,7 @@ def generate_datasets(n_draw=10000, n_discard=3000, n_knock=3000):
         writer.writerows(draw_rows)
     print(f"  Saved {len(draw_rows)} rows to {draw_path}")
 
-    # ========== 2. DISCARD DATASET ==========
+    # generate discard dataset
     print(f"Generating discard dataset ({n_discard} hands x 11 cards)...")
     discard_rows = []
     for i in range(n_discard):
@@ -345,7 +319,7 @@ def generate_datasets(n_draw=10000, n_discard=3000, n_knock=3000):
         writer.writerows(discard_rows)
     print(f"  Saved {len(discard_rows)} rows to {discard_path}")
 
-    # ========== 3. KNOCK/GIN DATASET ==========
+    # generate knock/gin dataset
     print(f"Generating knock/gin dataset ({n_knock} samples)...")
     knock_rows = []
     for i in range(n_knock):
@@ -372,9 +346,9 @@ def generate_datasets(n_draw=10000, n_discard=3000, n_knock=3000):
         writer.writerows(knock_rows)
     print(f"  Saved {len(knock_rows)} rows to {knock_path}")
 
-    print(f"\nAll datasets generated successfully!")
+    print(f"\nAll datasets generated!")
     print(f"   Draw:    {len(draw_rows)} rows")
-    print(f"   Discard: {len(discard_rows)} rows ({n_discard} hands x ~11 cards)")
+    print(f"   Discard: {len(discard_rows)} rows")
     print(f"   Knock:   {len(knock_rows)} rows")
 
 
